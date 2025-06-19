@@ -239,7 +239,7 @@
     <script type="module">
         // Importa le funzioni di Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, getDocs, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
         // CONFIGURAZIONE FIREBASE (INSERITA DA TE)
@@ -257,12 +257,15 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
+        // Dichiarazione dei listener a livello di modulo
+        let unsubscribeDevices = null;
+        let unsubscribeCategories = null;
+
         document.addEventListener('DOMContentLoaded', () => {
             let allDevices = [];
             let currentSort = { serie: 'prodotto', suMisura: 'prodotto' };
             let macroCategoriesList = [];
-            let unsubscribeDevices = null;
-            let unsubscribeCategories = null;
+            let categoriesDocId = null; // ID del documento delle categorie
             
             // Riferimenti al DOM (invariati)
             const searchInputEl = document.getElementById('searchInput');
@@ -309,36 +312,26 @@
             function highlightText(text, query) { if (!text) return ''; if (!query || query.length < 1) return text; const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const regex = new RegExp(`(${sanitizedQuery})`, 'gi'); return text.replace(regex, `<span class="highlight">$1</span>`); }
             function createDeviceListItem(device, query) { const item = document.createElement('div'); item.className = 'device-list-item'; item.innerHTML = `<div class="flex-grow"><div class="font-semibold text-gray-800 truncate">${highlightText(device.prodotto, query)}</div><div class="text-sm text-gray-500">${highlightText(device.marca, query)}</div></div><div class="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">${highlightText(device.categoriaOrtesi, query) || 'Senza categoria'}</div>`; item.addEventListener('click', () => openDeviceModal(device)); return item; }
             
-            // --- Funzioni di Visualizzazione e Filtro (leggermente modificate) ---
+            // Funzioni di Visualizzazione e Filtro (invariate)
             function populateFilters() {
+                const currentCategory = filterMacroCategoryEl.value;
+                const currentMarca = filterMarcaEl.value;
                 filterMacroCategoryEl.innerHTML = '<option value="">Tutte le Macro Categorie</option>';
-                [...macroCategoriesList].sort().forEach(cat => {
-                    const option = document.createElement('option');
-                    option.value = cat;
-                    option.textContent = cat;
-                    filterMacroCategoryEl.appendChild(option);
-                });
-
+                [...macroCategoriesList].sort().forEach(cat => { const option = document.createElement('option'); option.value = cat; option.textContent = cat; filterMacroCategoryEl.appendChild(option); });
                 const marche = [...new Set(allDevices.map(d => d.marca).filter(Boolean))].sort();
                 filterMarcaEl.innerHTML = '<option value="">Tutte le Marche</option>';
-                marche.forEach(marca => {
-                    const option = document.createElement('option');
-                    option.value = marca;
-                    option.textContent = marca;
-                    filterMarcaEl.appendChild(option);
-                });
+                marche.forEach(marca => { const option = document.createElement('option'); option.value = marca; option.textContent = marca; filterMarcaEl.appendChild(option); });
+                filterMacroCategoryEl.value = currentCategory;
+                filterMarcaEl.value = currentMarca;
             }
-
             function updateAndDisplayLists() {
                 const query = searchInputEl.value.toLowerCase().trim();
                 const selectedMacroCategory = filterMacroCategoryEl.value;
                 const selectedMarca = filterMarcaEl.value;
-
                 let filteredDevices = allDevices;
                 if(selectedMacroCategory) { filteredDevices = filteredDevices.filter(d => d.macroCategoria === selectedMacroCategory); }
                 if(selectedMarca) { filteredDevices = filteredDevices.filter(d => d.marca === selectedMarca); }
                 if(query) { filteredDevices = filteredDevices.filter(device => { const searchString = [device.macroCategoria, device.prodotto, device.marca, device.categoriaOrtesi, device.patologie, ...(device.codici || []).map(c => `${c.codice} ${c.descrizione}`)].join(' ').toLowerCase(); return searchString.includes(query); }); }
-
                 const sortFn = (a, b, key) => (a[key] || '').localeCompare(b[key] || '', 'it', { sensitivity: 'base' });
                 const serieDevices = filteredDevices.filter(d => d.tipoDispositivo === "Di Serie").sort((a,b) => sortFn(a, b, currentSort.serie));
                 const suMisuraDevices = filteredDevices.filter(d => d.tipoDispositivo === "Su Misura").sort((a,b) => sortFn(a, b, currentSort.suMisura));
@@ -346,14 +339,13 @@
                 renderGroupedList(devicesListSuMisuraEl, suMisuraDevices, query);
                 noResultsSerieEl.classList.toggle('hidden', serieDevices.length > 0);
                 noResultsSuMisuraEl.classList.toggle('hidden', suMisuraDevices.length > 0);
-                noResultsGlobalEl.classList.toggle('hidden', filteredDevices.length > 0);
+                noResultsGlobalEl.classList.toggle('hidden', filteredDevices.length > 0 || (serieDevices.length === 0 && suMisuraDevices.length === 0 && query === '' && selectedMacroCategory === '' && selectedMarca === ''));
             }
             function renderGroupedList(container, devices, query) { container.innerHTML = ''; const isSearching = query.length > 0 || filterMacroCategoryEl.value || filterMarcaEl.value; const grouped = devices.reduce((acc, device) => { const key = device.macroCategoria || 'Senza Categoria'; if (!acc[key]) { acc[key] = []; } acc[key].push(device); return acc; }, {}); const sortedMacroCategories = Object.keys(grouped).sort((a,b) => a.localeCompare(b)); sortedMacroCategories.forEach(macroCat => { const groupContainer = document.createElement('div'); const title = document.createElement('h3'); title.className = `macro-category-title ${!isSearching ? 'collapsed' : ''}`; title.innerHTML = `<span>${macroCat}</span> <span class="arrow text-gray-500">&#9660;</span>`; const contentGrid = document.createElement('div'); contentGrid.className = `macro-category-content grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ${!isSearching ? 'hidden' : ''}`; grouped[macroCat].forEach(device => contentGrid.appendChild(createDeviceListItem(device, query))); title.addEventListener('click', () => { title.classList.toggle('collapsed'); contentGrid.classList.toggle('hidden'); }); groupContainer.appendChild(title); groupContainer.appendChild(contentGrid); container.appendChild(groupContainer); }); }
             
             // --- Logica Modale Dispositivo con Calcoli ---
             function updateCodeTotals(modalBoxEl) { let grandTotal = 0; const codeRows = modalBoxEl.querySelectorAll('.code-row'); codeRows.forEach(row => { const prezzoInput = row.querySelector('.edit-prezzo-val'); const quantitaInput = row.querySelector('.edit-quantita-val'); const subtotalEl = row.querySelector('.subtotal-display'); const prezzoString = (prezzoInput.value || '0').replace(',', '.'); const prezzo = parseFloat(prezzoString) || 0; const quantita = parseInt(quantitaInput.value, 10) || 1; const subtotal = prezzo * quantita; if(subtotalEl) { subtotalEl.textContent = `Subtotale: ${subtotal.toFixed(2).replace('.', ',')} €`; } grandTotal += subtotal; }); const grandTotalEl = modalBoxEl.querySelector('#grand-total-display'); if (grandTotalEl) { grandTotalEl.textContent = `Totale Complessivo: ${grandTotal.toFixed(2).replace('.', ',')} €`; } }
             
-            // --- Funzioni CRUD con Firebase ---
             async function handleSaveDevice(device, isNew) {
                 const modalBox = deviceModalBoxEl;
                 const updatedData = { 
@@ -398,97 +390,106 @@
                 });
             }
 
-            // ... (altre funzioni modali e di esportazione rimangono quasi identiche)
-
-            function setupEventListeners() {
-                // ... (listeners esistenti)
-                resetFiltersBtn.addEventListener('click', () => {
-                    searchInputEl.value = '';
-                    filterMacroCategoryEl.value = '';
-                    filterMarcaEl.value = '';
-                    updateAndDisplayLists();
-                });
-                [searchInputEl, filterMacroCategoryEl, filterMarcaEl].forEach(el => el.addEventListener('input', updateAndDisplayLists));
+            function addModalEventListeners(device) {
+                const modalBox = deviceModalBoxEl;
+                modalBox.querySelector('.close-modal-btn').addEventListener('click', () => closeModal(deviceModalEl));
+                const editBtn = modalBox.querySelector('.edit-btn');
+                if (editBtn) editBtn.addEventListener('click', () => renderModalContent(device, true));
+                const exportSingleBtn = modalBox.querySelector('.export-single-pdf-btn');
+                if (exportSingleBtn) exportSingleBtn.addEventListener('click', () => handleExportSingleDevicePDF(device));
+                const cancelBtn = modalBox.querySelector('.cancel-edit-btn');
+                if (cancelBtn) cancelBtn.addEventListener('click', () => { if (device.id) { renderModalContent(device, false); } else { closeModal(deviceModalEl); } });
+                const saveBtn = modalBox.querySelector('.save-btn');
+                if (saveBtn) saveBtn.addEventListener('click', () => handleSaveDevice(device, !device.id));
+                const deleteBtn = modalBox.querySelector('.delete-btn');
+                if (deleteBtn) deleteBtn.addEventListener('click', () => handleDeleteDevice(device.id));
+                const addCodeBtn = modalBox.querySelector('.add-code-btn');
+                if(addCodeBtn) addCodeBtn.addEventListener('click', () => { const codesContainer = modalBox.querySelector('.edit-codes-container'); const codeRow = document.createElement('div'); codeRow.className = "code-row space-y-1 border-t pt-2 mt-2"; codeRow.innerHTML = `<div class="grid grid-cols-[1fr,90px,70px,auto] gap-2 items-center"><input type="text" class="edit-codice-val p-1 border rounded" placeholder="Codice LEA"><input type="number" class="edit-quantita-val p-1 border rounded text-center" value="1" min="1" placeholder="Q.tà"><input type="text" class="edit-prezzo-val p-1 border rounded" placeholder="Prezzo (€)"><button class="remove-code-btn text-red-500 hover:text-red-700 p-1" aria-label="Rimuovi codice"><i class="fas fa-trash-alt"></i></button></div><input type="text" class="edit-desc-val w-full p-1 border rounded" placeholder="Descrizione del codice"><div class="subtotal-display text-right text-sm font-semibold text-gray-600 pr-10">Subtotale: 0.00 €</div>`; codesContainer.appendChild(codeRow); codeRow.querySelector('.remove-code-btn').addEventListener('click', (e) => { e.currentTarget.closest('.code-row').remove(); updateCodeTotals(modalBox); }); codeRow.querySelectorAll('.edit-prezzo-val, .edit-quantita-val').forEach(input => input.addEventListener('input', () => updateCodeTotals(modalBox))); updateCodeTotals(modalBox); });
+                modalBox.querySelectorAll('.remove-code-btn').forEach(btn => { btn.addEventListener('click', (e) => { e.currentTarget.closest('.code-row').remove(); updateCodeTotals(modalBox); }); });
+                modalBox.querySelectorAll('.edit-prezzo-val, .edit-quantita-val').forEach(input => input.addEventListener('input', () => updateCodeTotals(modalBox)));
             }
-
-            // --- FUNZIONE DI INIZIALIZZAZIONE CON FIREBASE ---
-            async function initializeAppWithFirebase(user) {
-                if (!user) {
-                    // Gestisci utente non loggato se necessario
-                    console.log("Utente non autenticato.");
-                    return;
+            function renderModalContent(device, isEditing) {
+                const modalHeader = deviceModalBoxEl.querySelector('.modal-header'); const modalBody = deviceModalBoxEl.querySelector('.modal-body'); const modalFooter = deviceModalBoxEl.querySelector('.modal-footer');
+                modalHeader.innerHTML = `<h3 class="text-xl font-bold">${isEditing ? (device.id ? 'Modifica Dispositivo' : 'Nuovo Dispositivo') : device.prodotto}</h3><button class="close-modal-btn text-2xl text-gray-500 hover:text-gray-800" aria-label="Chiudi modale">&times;</button>`;
+                if (isEditing) {
+                    const macroCategoryOptions = macroCategoriesList.map(cat => `<option value="${cat}" ${device.macroCategoria === cat ? 'selected' : ''}>${cat}</option>`).join('');
+                    const codesHtml = (device.codici && device.codici.length > 0 ? device.codici : [{codice:'', prezzo:'', descrizione:'', quantita: 1}]).map(c => { const prezzoVal = parseFloat(String(c.prezzo || '0').replace(',', '.')) || 0; const quantitaVal = parseInt(c.quantita, 10) || 1; const subtotal = prezzoVal * quantitaVal; return `<div class="code-row space-y-1 border-t pt-2 mt-2 first:border-t-0 first:pt-0 first:mt-0"><div class="grid grid-cols-[1fr,90px,70px,auto] gap-2 items-center"><input type="text" value="${c.codice || ''}" class="edit-codice-val p-1 border rounded" placeholder="Codice LEA"><input type="number" value="${quantitaVal}" min="1" class="edit-quantita-val p-1 border rounded text-center" placeholder="Q.tà"><input type="text" value="${c.prezzo || ''}" class="edit-prezzo-val p-1 border rounded" placeholder="Prezzo (€)"><button class="remove-code-btn text-red-500 hover:text-red-700 p-1" aria-label="Rimuovi codice"><i class="fas fa-trash-alt"></i></button></div><input type="text" value="${c.descrizione || ''}" class="edit-desc-val w-full p-1 border rounded" placeholder="Descrizione del codice"><div class="subtotal-display text-right text-sm font-semibold text-gray-600 pr-10">Subtotale: ${subtotal.toFixed(2).replace('.',',')} €</div></div>`; }).join('');
+                    modalBody.innerHTML = `<div class="flex-col space-y-4"><div><label class="font-semibold text-gray-600 text-sm">Macro Categoria</label><select class="edit-macrocategoria w-full p-2 border rounded mt-1 bg-white">${macroCategoryOptions}</select></div><div><label class="font-semibold text-gray-600 text-sm">Nome Prodotto</label><input type="text" value="${device.prodotto || ''}" class="edit-prodotto w-full p-2 border rounded mt-1" placeholder="Nome Prodotto"></div><div><label class="font-semibold text-gray-600 text-sm">Marca</label><input type="text" value="${device.marca || ''}" class="edit-marca w-full p-2 border rounded mt-1" placeholder="Marca"></div><div><label class="font-semibold text-gray-600 text-sm">Categoria Specifica</label><input type="text" value="${device.categoriaOrtesi || ''}" class="edit-categoria w-full p-2 border rounded mt-1" placeholder="Es. Ginocchio, Piede..."></div><div><label class="font-semibold text-gray-600 text-sm">Patologie (separate da virgola)</label><textarea class="edit-patologie w-full p-2 border rounded h-24 mt-1" placeholder="Patologie">${device.patologie || ''}</textarea></div><div><label class="font-semibold text-gray-600 text-sm">Note</label><textarea class="edit-note w-full p-2 border rounded h-24 mt-1" placeholder="Aggiungi note...">${device.note || ''}</textarea></div><h4 class="font-semibold pt-2 border-t">Codici LEA</h4><div class="edit-codes-container space-y-2 max-h-48 overflow-y-auto pr-2">${codesHtml}</div><button class="add-code-btn mt-2 text-sm text-sky-600 hover:text-sky-800">+ Aggiungi Codice</button><div id="grand-total-display" class="text-right text-lg font-bold text-gray-800 mt-2 pr-10"></div></div>`;
+                    modalFooter.innerHTML = `<div class="flex justify-between items-center"><button class="delete-btn text-gray-400 hover:text-red-500" ${!device.id ? 'style="display:none;"' : ''}><i class="fas fa-trash mr-1"></i> Elimina</button><div class="space-x-2"><button class="cancel-edit-btn bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500">Annulla</button><button class="save-btn bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">Salva</button></div></div>`;
+                    updateCodeTotals(deviceModalBoxEl);
+                } else {
+                    let grandTotal = 0;
+                    const codesHtml = (device.codici && device.codici.length > 0) ? device.codici.map(c => { const prezzoVal = parseFloat(String(c.prezzo || '0').replace(',', '.')) || 0; const quantitaVal = parseInt(c.quantita, 10) || 1; const subtotal = prezzoVal * quantitaVal; grandTotal += subtotal; return `<li class="p-2 bg-gray-50 rounded"><div class="flex justify-between items-baseline"><strong class="text-base">${c.codice}</strong><span class="text-sm">Q.tà: ${quantitaVal} x ${prezzoVal.toFixed(2).replace('.',',')} €</span><span class="text-green-700 font-semibold">Subtotale: ${subtotal.toFixed(2).replace('.',',')} €</span></div><p class="text-gray-600 mt-1 text-sm">${c.descrizione || 'Nessuna descrizione'}</p></li>`; }).join('') : '<li class="text-gray-500">Nessun codice associato.</li>';
+                     modalBody.innerHTML = `<div class="view-mode-field space-y-3"><p><strong>Macro Categoria:</strong> <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">${device.macroCategoria || 'N/D'}</span></p><p><strong>Marca:</strong> ${device.marca || 'N/D'}</p><p><strong>Categoria Specifica:</strong> ${device.categoriaOrtesi || 'N/D'}</p><div><strong>Patologie:</strong> <div class="mt-1 p-2 bg-gray-50 rounded text-sm">${device.patologie ? device.patologie.replace(/,/g, ', ') : 'N/D'}</div></div><div><strong>Note:</strong> <div class="mt-1 p-2 bg-gray-50 rounded text-sm">${device.note || 'Nessuna nota.'}</div></div><h4 class="font-semibold pt-2 border-t">Codici Nuovi LEA</h4><ul class="space-y-2">${codesHtml}</ul><div class="text-right text-xl font-bold text-gray-800 mt-4 pt-2 border-t">Totale Complessivo: ${grandTotal.toFixed(2).replace('.',',')} €</div></div>`;
+                     modalFooter.innerHTML = `<div class="flex justify-end gap-2"><button class="export-single-pdf-btn bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"><i class="fas fa-file-pdf mr-2"></i>Esporta PDF</button><button class="edit-btn bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600"><i class="fas fa-pencil-alt mr-2"></i>Modifica</button></div>`;
                 }
-
-                // Migrazione da localStorage (solo se non è mai stata fatta)
-                if(localStorage.getItem('leaDevicesData') && !localStorage.getItem('firebaseMigrationDone')) {
-                    await migrateDataToFirestore();
-                }
-
-                // Listener per i dispositivi
+                addModalEventListeners(device);
+            }
+            function openDeviceModal(device) { renderModalContent(device, !device.id); openModal(deviceModalEl); }
+            function handleAddNewDevice(tipo) { const newDevice = { macroCategoria: macroCategoriesList.includes("Altro") ? "Altro" : macroCategoriesList[0], prodotto: "", marca: "", categoriaOrtesi: "", patologie: "", note: "", codici: [], tipoDispositivo: tipo, id: null }; openDeviceModal(newDevice); }
+            function renderCategoriesModal() { const categoryListEl = document.getElementById('categoryList'); categoryListEl.innerHTML = ''; macroCategoriesList.forEach(cat => { const li = document.createElement('li'); li.className = 'flex justify-between items-center p-2 bg-gray-100 rounded space-x-2'; const input = document.createElement('input'); input.type = 'text'; input.value = cat; input.readOnly = true; input.className = 'category-item-input flex-grow p-1 border rounded'; input.dataset.originalName = cat; const buttonsDiv = document.createElement('div'); buttonsDiv.className = 'flex items-center space-x-2'; const editBtn = document.createElement('button'); editBtn.className = 'edit-category-btn text-blue-500 hover:text-blue-700'; editBtn.innerHTML = '<i class="fas fa-pencil-alt"></i>'; const saveBtn = document.createElement('button'); saveBtn.className = 'save-category-btn text-green-500 hover:text-green-700 hidden'; saveBtn.innerHTML = '<i class="fas fa-save"></i>'; const deleteBtn = document.createElement('button'); deleteBtn.className = 'delete-category-btn text-red-500 hover:text-red-700'; deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>'; if (cat === 'Altro') { editBtn.disabled = true; editBtn.classList.add('opacity-50', 'cursor-not-allowed'); deleteBtn.disabled = true; deleteBtn.classList.add('opacity-50', 'cursor-not-allowed'); } else { editBtn.onclick = () => { input.readOnly = false; input.classList.add('editing'); input.focus(); editBtn.classList.add('hidden'); saveBtn.classList.remove('hidden'); }; saveBtn.onclick = () => handleUpdateCategory(input.dataset.originalName, input.value); deleteBtn.onclick = () => handleDeleteCategory(cat); } li.appendChild(input); buttonsDiv.appendChild(editBtn); buttonsDiv.appendChild(saveBtn); buttonsDiv.appendChild(deleteBtn); li.appendChild(buttonsDiv); categoryListEl.appendChild(li); }); }
+            async function handleUpdateCategory(oldName, newName) { const trimmedNewName = newName.trim(); if (!trimmedNewName) { showNotification("Il nome della categoria non può essere vuoto."); return; } if (macroCategoriesList.find(c => c.toLowerCase() === trimmedNewName.toLowerCase() && c.toLowerCase() !== oldName.toLowerCase())) { showNotification("Questa categoria esiste già."); return; } const batch = writeBatch(db); const q = query(collection(db, "devices"), where("macroCategoria", "==", oldName)); const querySnapshot = await getDocs(q); querySnapshot.forEach((doc) => { batch.update(doc.ref, { macroCategoria: trimmedNewName }); }); const updatedList = macroCategoriesList.map(c => c === oldName ? trimmedNewName : c); const catDocRef = doc(db, "categories", categoriesDocId); batch.update(catDocRef, { list: updatedList }); try { await batch.commit(); } catch (e) { console.error("Errore aggiornamento categoria:", e); } }
+            async function handleDeleteCategory(categoryToDelete) { openConfirmationModal('Conferma Eliminazione Categoria', `Sei sicuro di voler eliminare "${categoryToDelete}"? I dispositivi associati verranno spostati in "Altro".`, async () => { const batch = writeBatch(db); const q = query(collection(db, "devices"), where("macroCategoria", "==", categoryToDelete)); const querySnapshot = await getDocs(q); querySnapshot.forEach((doc) => { batch.update(doc.ref, { macroCategoria: "Altro" }); }); const updatedList = macroCategoriesList.filter(c => c !== categoryToDelete); const catDocRef = doc(db, "categories", categoriesDocId); batch.update(catDocRef, { list: updatedList }); try { await batch.commit(); closeConfirmationModal(); } catch(e) { console.error(e); } }); }
+            async function handleAddCategory(newCat) { if(newCat && !macroCategoriesList.find(c => c.toLowerCase() === newCat.toLowerCase())) { const updatedList = [...macroCategoriesList, newCat]; const catDocRef = doc(db, "categories", categoriesDocId); try { await updateDoc(catDocRef, { list: updatedList }); } catch(e) { console.error(e); } } else if (!newCat) { showNotification("Il nome della categoria non può essere vuoto."); } else { showNotification("Questa categoria esiste già."); } }
+            function openExportOptionsModal() { const listEl = document.getElementById('exportCategoriesList'); listEl.innerHTML = ''; macroCategoriesList.forEach(cat => { const label = document.createElement('label'); label.className = 'flex items-center'; label.innerHTML = `<input type="checkbox" name="exportCategory" value="${cat}" checked class="h-4 w-4 rounded border-gray-300 text-sky-600 focus:ring-sky-500"><span class="ml-2 text-gray-700">${cat}</span>`; listEl.appendChild(label); }); document.getElementById('toggleAllCategoriesBtn').textContent = 'Deseleziona tutto'; openModal(exportOptionsModalEl); }
+            function generateCustomPDF() { const form = document.getElementById('exportOptionsForm'); const selectedTipi = Array.from(form.querySelectorAll('input[name="exportTipo"]:checked')).map(el => el.value); const selectedCategories = Array.from(form.querySelectorAll('input[name="exportCategory"]:checked')).map(el => el.value); if (selectedTipi.length === 0 || selectedCategories.length === 0) { showNotification("Seleziona almeno un tipo di dispositivo e una categoria da esportare."); return; } const devicesToExport = allDevices.filter(device => selectedTipi.includes(device.tipoDispositivo) && selectedCategories.includes(device.macroCategoria)); if (devicesToExport.length === 0) { showNotification("Nessun dispositivo corrisponde ai filtri selezionati."); return; } const { jsPDF } = window.jspdf; const doc = new jsPDF(); doc.setFontSize(18); doc.text("Catalogo Dispositivi LEA (Personalizzato)", 14, 22); const createTable = (title, devices) => { if (devices.length === 0) return false; const head = [['Prodotto', 'Marca', 'Macro Cat.', 'Cat. Specifica', 'Codici']]; const body = devices.map(d => [d.prodotto || '', d.marca || '', d.macroCategoria || '', d.categoriaOrtesi || '', (d.codici || []).map(c => c.codice).join(', ')]); doc.autoTable({ head, body, didDrawPage: (data) => { doc.setFontSize(20); doc.text(title, data.settings.margin.left, 15); }, margin: { top: 30 } }); return true; }; let pageAdded = false; if (selectedTipi.includes('Di Serie')) { const serieDevices = devicesToExport.filter(d => d.tipoDispositivo === "Di Serie"); if (serieDevices.length > 0) { createTable("Ortesi di Serie", serieDevices); pageAdded = true; } } if (selectedTipi.includes('Su Misura')) { const suMisuraDevices = devicesToExport.filter(d => d.tipoDispositivo === "Su Misura"); if (suMisuraDevices.length > 0) { if(pageAdded) doc.addPage(); createTable("Ortesi su Misura", suMisuraDevices); } } doc.save('catalogo_lea_personalizzato.pdf'); closeModal(exportOptionsModalEl); }
+            function handleExportSingleDevicePDF(device) { const { jsPDF } = window.jspdf; const doc = new jsPDF(); let grandTotal = 0; let yPos = 115; doc.setFontSize(22); doc.text("Scheda Tecnica Dispositivo", 14, 20); doc.setFontSize(12); doc.text(`Prodotto: ${device.prodotto || 'N/D'}`, 14, 40); doc.text(`Marca: ${device.marca || 'N/D'}`, 14, 50); doc.text(`Tipo: ${device.tipoDispositivo || 'N/D'}`, 14, 60); doc.text(`Macro Categoria: ${device.macroCategoria || 'N/D'}`, 14, 70); doc.text(`Categoria Specifica: ${device.categoriaOrtesi || 'N/D'}`, 14, 80); doc.setFontSize(14); doc.text("Patologie:", 14, 95); doc.setFontSize(11); yPos = doc.splitTextToSize(device.patologie || 'Nessuna patologia specificata.', 180).length * 5 + 102; doc.text(device.patologie || 'Nessuna patologia specificata.', 14, 102, { maxWidth: 180 }); doc.setFontSize(14); doc.text("Note:", 14, yPos); doc.setFontSize(11); yPos = doc.splitTextToSize(device.note || 'Nessuna nota.', 180).length * 5 + yPos + 7; doc.text(device.note || 'Nessuna nota.', 14, yPos - 5, { maxWidth: 180 }); yPos += 10; doc.setFontSize(14); doc.text("Codici LEA Associati:", 14, yPos); const head = [['Codice', 'Prezzo (€)', 'Q.tà', 'Subtotale (€)', 'Descrizione']]; const body = (device.codici && device.codici.length > 0) ? device.codici.map(c => { const prezzo = parseFloat(String(c.prezzo || '0').replace(',','.')) || 0; const quantita = parseInt(c.quantita, 10) || 1; const subtotal = prezzo * quantita; grandTotal += subtotal; return [c.codice || '', prezzo.toFixed(2).replace('.',','), quantita, subtotal.toFixed(2).replace('.',','), c.descrizione || '']}) : [['Nessun codice', '', '', '', '']]; doc.autoTable({ head, body, startY: yPos + 5, theme: 'grid', headStyles: { fillColor: [41, 128, 186] }, footStyles: { fontStyle: 'bold', fontSize: 12, fillColor: [230, 230, 230], textColor: 0 }, foot: [['', '', '', 'Totale:', `${grandTotal.toFixed(2).replace('.',',')} €`]] }); doc.save(`scheda_${(device.prodotto || 'dispositivo').replace(/\s+/g, '_')}.pdf`); }
+            function handleExportCSV() { if (allDevices.length === 0) { showNotification("Nessun dato da esportare."); return; } const headers = ['ID', 'Prodotto', 'Marca', 'Tipo Dispositivo', 'Macro Categoria', 'Categoria Specifica', 'Patologie', 'Note', 'Codice LEA', 'Quantita', 'Prezzo', 'Descrizione Codice']; let csvContent = headers.join(',') + '\r\n'; allDevices.forEach(device => { if (device.codici && device.codici.length > 0) { device.codici.forEach(code => { const row = [ device.id, `"${(device.prodotto || '').replace(/"/g, '""')}"`, `"${(device.marca || '').replace(/"/g, '""')}"`, device.tipoDispositivo, device.macroCategoria, device.categoriaOrtesi, `"${(device.patologie || '').replace(/"/g, '""')}"`, `"${(device.note || '').replace(/"/g, '""')}"`, code.codice, code.quantita || 1, code.prezzo, `"${(code.descrizione || '').replace(/"/g, '""')}"` ]; csvContent += row.join(',') + '\r\n'; }); } else { const row = [ device.id, `"${(device.prodotto || '').replace(/"/g, '""')}"`, `"${(device.marca || '').replace(/"/g, '""')}"`, device.tipoDispositivo, device.macroCategoria, device.categoriaOrtesi, `"${(device.patologie || '').replace(/"/g, '""')}"`, `"${(device.note || '').replace(/"/g, '""')}"`, '', '', '', '' ]; csvContent += row.join(',') + '\r\n'; } }); const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url); link.setAttribute("download", "catalogo_lea.csv"); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+            
+            function setupEventListeners() {
+                document.getElementById('addDeviceSerie').addEventListener('click', () => handleAddNewDevice('Di Serie'));
+                document.getElementById('addDeviceSuMisura').addEventListener('click', () => handleAddNewDevice('Su Misura'));
+                const setupSort = (btn, dropdown, type) => { btn.addEventListener('click', (e) => { e.stopPropagation(); if(dropdown.id !== 'sortDropdownSerie') sortDropdownSerie.style.display = 'none'; if(dropdown.id !== 'sortDropdownSuMisura') sortDropdownSuMisura.style.display = 'none'; dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block'; }); dropdown.addEventListener('click', (e) => { if (e.target.classList.contains('sort-option')) { currentSort[type] = e.target.dataset.sortBy; updateAndDisplayLists(); dropdown.style.display = 'none'; } }); };
+                setupSort(sortButtonSerie, sortDropdownSerie, 'serie');
+                setupSort(sortButtonSuMisura, sortDropdownSuMisura, 'suMisura');
+                document.addEventListener('click', () => { sortDropdownSerie.style.display = 'none'; sortDropdownSuMisura.style.display = 'none'; });
+                exportDataBtn.addEventListener('click', () => { if (allDevices.length === 0) { showNotification("Nessun dato da esportare."); return; } const dataStr = JSON.stringify(allDevices, null, 2); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const exportFileDefaultName = `lea_backup_${new Date().toISOString().slice(0,10)}.json`; const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', exportFileDefaultName); linkElement.click(); });
+                importDataBtn.addEventListener('click', () => importFileIn.click());
+                importFileIn.addEventListener('change', (event) => { if(!event.target.files[0]) return; const reader = new FileReader(); reader.onload = (e) => { openConfirmationModal('Conferma Importazione Dati','ATTENZIONE: Stai per sovrascrivere tutti i dati esistenti. Vuoi procedere?', () => { try { const importedData = JSON.parse(e.target.result); if (!Array.isArray(importedData)) throw new Error("Dati non validi."); allDevices = importedData;  const importedCategories = [...new Set(importedData.map(d => d.macroCategoria).filter(Boolean))]; if(!importedCategories.includes('Altro')) importedCategories.push('Altro'); macroCategoriesList = importedCategories; saveDataToLocalStorage(); updateAndDisplayLists(); populateFilters(); showNotification("Dati importati con successo!"); } catch (err) { console.error("Errore importazione:", err); showNotification("Errore: Il file non è valido o il formato JSON non è corretto."); } closeConfirmationModal(); }); }; reader.readAsText(event.target.files[0]); event.target.value = ''; });
+                manageCategoriesBtn.addEventListener('click', () => { renderCategoriesModal(); openModal(categoriesModalEl); });
+                categoriesModalEl.querySelectorAll('.close-button').forEach(btn => btn.addEventListener('click', () => closeModal(categoriesModalEl)));
+                document.getElementById('addCategoryButton').addEventListener('click', () => { const input = document.getElementById('newCategoryInput'); const newCat = input.value.trim(); handleAddCategory(newCat); input.value = ''; });
+                exportPdfBtn.addEventListener('click', openExportOptionsModal);
+                exportCsvBtn.addEventListener('click', handleExportCSV);
+                document.getElementById('generatePdfBtn').addEventListener('click', generateCustomPDF);
+                exportOptionsModalEl.querySelectorAll('.close-button').forEach(btn => btn.addEventListener('click', () => closeModal(exportOptionsModalEl)));
+                document.getElementById('toggleAllCategoriesBtn').addEventListener('click', (e) => { const checkboxes = exportOptionsModalEl.querySelectorAll('input[name="exportCategory"]'); const allChecked = Array.from(checkboxes).every(cb => cb.checked); checkboxes.forEach(cb => cb.checked = !allChecked); e.target.textContent = allChecked ? 'Seleziona tutto' : 'Deseleziona tutto'; });
+                const toggleMainSection = (toggleElement, listContainer) => { listContainer.classList.toggle('hidden'); toggleElement.classList.toggle('collapsed'); };
+                toggleSerieEl.addEventListener('click', () => toggleMainSection(toggleSerieEl, devicesListSerieEl));
+                toggleSuMisuraEl.addEventListener('click', () => toggleMainSection(toggleSuMisuraEl, devicesListSuMisuraEl));
+                searchInputEl.addEventListener('input', () => updateAndDisplayLists());
+                filterMacroCategoryEl.addEventListener('change', () => updateAndDisplayLists());
+                filterMarcaEl.addEventListener('change', () => updateAndDisplayLists());
+                resetFiltersBtn.addEventListener('click', () => { searchInputEl.value = ''; filterMacroCategoryEl.value = ''; filterMarcaEl.value = ''; updateAndDisplayLists(); });
+                cancelActionBtn.addEventListener('click', closeConfirmationModal);
+                confirmActionBtn.addEventListener('click', () => { if (confirmationCallback) confirmationCallback(); });
+                notificationOkButton.addEventListener('click', () => closeModal(notificationModalEl));
+            }
+            
+            function initializeAppWithFirebase(user) {
+                if (!user) { console.log("Utente non autenticato."); return; }
                 const devicesCol = collection(db, "devices");
                 unsubscribeDevices = onSnapshot(devicesCol, (snapshot) => {
                     allDevices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     updateAndDisplayLists();
                     populateFilters(); 
                 });
-
-                // Listener per le categorie
                 const categoriesCol = collection(db, "categories");
                 unsubscribeCategories = onSnapshot(categoriesCol, (snapshot) => {
                     if(snapshot.docs.length > 0) {
+                        categoriesDocId = snapshot.docs[0].id;
                         macroCategoriesList = snapshot.docs[0].data().list || [];
                     } else {
-                        // Se non ci sono categorie, crea il documento iniziale
                         const initialCategories = ["Arti Superiori", "Arti Inferiori", "Tronco", "Altro"];
                         addDoc(categoriesCol, { list: initialCategories });
                     }
                     populateFilters();
                 });
-                
                 setupEventListeners();
             }
             
-            async function migrateDataToFirestore() {
-                 openConfirmationModal(
-                    "Migrazione Dati",
-                    "Sembra che tu abbia dati salvati localmente. Vuoi copiarli sul cloud? Questa operazione verrà eseguita una sola volta.",
-                    async () => {
-                        console.log("Inizio migrazione...");
-                        const localDevices = JSON.parse(localStorage.getItem('leaDevicesData'));
-                        const localCategories = JSON.parse(localStorage.getItem('leaMacroCategories'));
-                        
-                        const batch = writeBatch(db);
-                        const devicesCol = collection(db, "devices");
-                        localDevices.forEach(device => {
-                            const newDocRef = doc(devicesCol);
-                            batch.set(newDocRef, device);
-                        });
-                        
-                        // Sostituisci il documento delle categorie con quello locale
-                        const categoriesCol = collection(db, "categories");
-                        const categoriesSnapshot = await getDocs(categoriesCol);
-                        categoriesSnapshot.forEach(doc => batch.delete(doc.ref)); // Cancella le vecchie
-                        const newCatDoc = doc(categoriesCol); // Crea un nuovo doc
-                        batch.set(newCatDoc, { list: localCategories });
-
-                        try {
-                            await batch.commit();
-                            localStorage.setItem('firebaseMigrationDone', 'true');
-                            showNotification("Migrazione completata con successo!");
-                            closeConfirmationModal();
-                        } catch (error) {
-                            console.error("Errore durante la migrazione: ", error);
-                            showNotification("Errore durante la migrazione dei dati.");
-                            closeConfirmationModal();
-                        }
-                    }
-                );
-            }
-
-            // --- Flusso di Autenticazione ---
             onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    console.log("Utente autenticato (anonimo):", user.uid);
                     initializeAppWithFirebase(user);
                 } else {
                     signInAnonymously(auth).catch((error) => {
@@ -496,10 +497,8 @@
                     });
                 }
             });
-
         });
     </script>
 </body>
 </html>
-
 

@@ -3,60 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Consultatore LEA Avanzato: Serie & Su Misura (Chiuso di Default)</title>
+    <title>Gestore Codici LEA (CRUD)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+        body { font-family: 'Inter', sans-serif; }
         .device-card {
             transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            height: 100%; /* Assicura che le card abbiano la stessa altezza nella griglia */
+            display: flex; flex-direction: column; justify-content: space-between; height: 100%;
         }
-        .device-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        .highlight {
-            background-color: yellow;
-            font-weight: bold;
-        }
-        .section-title {
-            border-bottom: 2px solid #0ea5e9; /* sky-500 */
-            padding-bottom: 8px;
-            margin-bottom: 16px;
-            cursor: pointer; /* Indica che è cliccabile */
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .section-title .arrow {
-            transition: transform 0.3s ease;
-        }
-        .section-title.collapsed .arrow {
-            transform: rotate(-90deg);
-        }
-        .device-grid-container {
-            transition: max-height 0.5s ease-out, opacity 0.5s ease-out, margin-bottom 0.5s ease-out;
-            overflow: hidden;
-            max-height: 4000px; /* Aumentato per contenere più dati, aggiustare se necessario */
-            opacity: 1;
-        }
-        .device-grid-container.hidden {
-            max-height: 0;
-            opacity: 0;
-            margin-bottom: 0 !important; /* Rimuove il margine quando collassato */
-        }
+        .device-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .highlight { background-color: yellow; font-weight: bold; }
+        .section-title { border-bottom: 2px solid #0ea5e9; padding-bottom: 8px; margin-bottom: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .section-title .arrow { transition: transform 0.3s ease; }
+        .section-title.collapsed .arrow { transform: rotate(-90deg); }
+        .device-grid-container { transition: max-height 0.5s ease-out, opacity 0.5s ease-out, margin-bottom 0.5s ease-out; overflow: hidden; max-height: 5000px; opacity: 1; }
+        .device-grid-container.hidden { max-height: 0; opacity: 0; margin-bottom: 0 !important; }
+        .edit-mode-controls, .edit-mode-field { display: none; }
+        .card-editing .view-mode-field { display: none; }
+        .card-editing .edit-mode-field, .card-editing .edit-mode-controls { display: flex; }
+        /* Stili per il Modal di Conferma */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-box { background-color: white; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+        .modal-box h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; }
+        .modal-box p { margin-bottom: 1.5rem; }
+        .modal-actions button { margin: 0 0.5rem; }
+        /* Stili per il dropdown di ordinamento */
+        .sort-dropdown { display: none; position: absolute; background-color: white; border: 1px solid #ddd; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 10; right: 0; }
+        .sort-dropdown button { display: block; width: 100%; text-align: left; padding: 0.5rem 1rem; font-size: 0.875rem; }
+        .sort-dropdown button:hover { background-color: #f3f4f6; }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div class="container mx-auto p-4 sm:p-6 lg:p-8">
         <header class="mb-8 text-center">
-            <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">Codifiche LEA Ortopedia Ruggiero</h1>
-            <p class="text-gray-600 mt-2">Esplora dispositivi "Di Serie" e "Su Misura".</p>
+            <h1 class="text-3xl sm:text-4xl font-bold text-sky-700">Gestore Codici LEA</h1>
+            <p class="text-gray-600 mt-2">Esplora, modifica e gestisci dispositivi "Di Serie" e "Su Misura".</p>
         </header>
 
         <div class="mb-8">
@@ -67,48 +49,91 @@
 
         <!-- Sezione Ortesi di Serie -->
         <section id="sectionSerieWrapper" class="mb-12">
-            <h2 id="toggleSerie" class="text-2xl font-semibold text-sky-700 section-title">
-                <span>Ortesi di Serie</span>
-                <span class="arrow text-sky-700">&#9660;</span>
-            </h2>
-            <div id="devicesContainerSerieWrapper" class="device-grid-container">
-                <div id="devicesContainerSerie" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                    <!-- Le card dei dispositivi DI SERIE verranno inserite qui -->
+            <div class="flex justify-between items-center mb-4">
+                 <h2 id="toggleSerie" class="text-2xl font-semibold text-sky-700 section-title flex-grow">
+                    <span>Ortesi di Serie</span>
+                    <span class="arrow text-sky-700">&#9660;</span>
+                </h2>
+                <div class="relative">
+                     <button id="sortButtonSerie" class="ml-4 text-gray-500 hover:text-sky-600 p-2 rounded-full"><i class="fas fa-gear"></i></button>
+                     <div id="sortDropdownSerie" class="sort-dropdown">
+                        <button class="sort-option" data-sort-by="prodotto">Ordina per Prodotto (A-Z)</button>
+                        <button class="sort-option" data-sort-by="marca">Ordina per Marca (A-Z)</button>
+                     </div>
                 </div>
+                <button id="addDeviceSerie" class="ml-2 bg-sky-500 text-white px-4 py-2 rounded-lg hover:bg-sky-600 transition-colors"><i class="fas fa-plus"></i> Aggiungi</button>
+            </div>
+            <div id="devicesContainerSerieWrapper" class="device-grid-container">
+                <div id="devicesContainerSerie" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4"></div>
             </div>
             <p id="noResultsSerie" class="hidden text-center text-gray-500 mt-6">Nessun dispositivo "Di Serie" trovato per questa ricerca.</p>
         </section>
 
         <!-- Sezione Ortesi su Misura -->
         <section id="sectionSuMisuraWrapper" class="mb-12">
-            <h2 id="toggleSuMisura" class="text-2xl font-semibold text-teal-700 section-title">
-                <span>Ortesi su Misura</span>
-                <span class="arrow text-teal-700">&#9660;</span>
-            </h2>
-            <div id="devicesContainerSuMisuraWrapper" class="device-grid-container">
-                <div id="devicesContainerSuMisura" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                    <!-- Le card dei dispositivi SU MISURA verranno inserite qui -->
+             <div class="flex justify-between items-center mb-4">
+                <h2 id="toggleSuMisura" class="text-2xl font-semibold text-teal-700 section-title flex-grow">
+                    <span>Ortesi su Misura</span>
+                    <span class="arrow text-teal-700">&#9660;</span>
+                </h2>
+                 <div class="relative">
+                     <button id="sortButtonSuMisura" class="ml-4 text-gray-500 hover:text-teal-600 p-2 rounded-full"><i class="fas fa-gear"></i></button>
+                     <div id="sortDropdownSuMisura" class="sort-dropdown">
+                        <button class="sort-option" data-sort-by="prodotto">Ordina per Prodotto (A-Z)</button>
+                        <button class="sort-option" data-sort-by="marca">Ordina per Marca (A-Z)</button>
+                     </div>
                 </div>
+                <button id="addDeviceSuMisura" class="ml-2 bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 transition-colors"><i class="fas fa-plus"></i> Aggiungi</button>
+            </div>
+            <div id="devicesContainerSuMisuraWrapper" class="device-grid-container">
+                <div id="devicesContainerSuMisura" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-4"></div>
             </div>
             <p id="noResultsSuMisura" class="hidden text-center text-gray-500 mt-6">Nessun dispositivo "Su Misura" trovato per questa ricerca.</p>
         </section>
         
         <div id="noResultsGlobal" class="hidden text-center text-gray-500 mt-10">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <p class="mt-2 text-xl">Nessun risultato trovato in nessuna categoria.</p>
             <p>Prova a modificare i termini di ricerca.</p>
         </div>
 
-        <footer class="mt-12 text-center text-sm text-gray-500">
-            <p>Dati estratti dai documenti PDF forniti. Verifica sempre con fonti ufficiali.</p>
-            <p>&copy; 2024 App Consultazione LEA</p>
+        <footer class="mt-12 text-center text-sm text-gray-500 border-t pt-6">
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Strumenti Avanzati</h3>
+            <div class="flex justify-center space-x-4">
+                <button id="exportDataButton" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"><i class="fas fa-download mr-2"></i>Esporta Dati</button>
+                <button id="importDataButton" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"><i class="fas fa-upload mr-2"></i>Importa Dati</button>
+                <input type="file" id="importFileInput" class="hidden" accept=".json">
+            </div>
         </footer>
     </div>
+    
+    <!-- Modal di Conferma -->
+    <div id="confirmationModal" class="modal-overlay">
+        <div class="modal-box">
+            <h3 id="modalTitle" class="text-xl font-semibold text-gray-800">Conferma Azione</h3>
+            <p id="modalText" class="text-gray-600">Sei sicuro di voler procedere?</p>
+            <div class="modal-actions">
+                <button id="cancelActionButton" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-400">Annulla</button>
+                <button id="confirmActionButton" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">Conferma</button>
+            </div>
+        </div>
+    </div>
 
-    <script>
-        const allDevicesData = [
+    <script type="module">
+        // Importa le funzioni di Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, getDocs, addDoc, updateDoc, deleteDoc, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Variabili Globali ---
+        let db, auth, userId;
+        let allDevicesFromDB = []; // Cache locale dei dispositivi
+        let currentSort = { serie: 'prodotto', suMisura: 'prodotto' }; // Stato di ordinamento
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const devicesCollectionPath = `/artifacts/${appId}/public/data/devices`;
+        
+        // Dati iniziali per popolare il database la prima volta
+        const initialDevicesData = [
           // --- DISPOSITIVI DI SERIE (dal PDF ORTESI_DI_SERIE.pdf) ---
           { prodotto: "Spry Step Max / Toe off (Tutore gamba piede in carbonio)", marca: "Thuasne", codiciLEA: ["06.12.06.018 760"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente;" },
           { prodotto: "Spry Step / Walk on (Tutore gamba piede in carbonio)", marca: "thuasne ottobock", codiciLEA: ["06.12.06.018 760"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente;" },
@@ -232,118 +257,343 @@
           { prodotto: "Tutore Elastico S. El. Li abduttore per bacino e cosce (tutore bacino)", marca: "Non specificata", codiciLEA: ["06.12.15.009"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi d'anca", patologie: "Non specificata"}
         ];
 
-        const devicesContainerSerieEl = document.getElementById('devicesContainerSerie');
-        const devicesContainerSuMisuraEl = document.getElementById('devicesContainerSuMisura');
+        // --- Elementi DOM e resto dello script (invariato)
         const searchInputEl = document.getElementById('searchInput');
-        const noResultsSerieEl = document.getElementById('noResultsSerie');
-        const noResultsSuMisuraEl = document.getElementById('noResultsSuMisura');
-        const noResultsGlobalEl = document.getElementById('noResultsGlobal');
+        const [devicesContainerSerieEl, devicesContainerSuMisuraEl] = [document.getElementById('devicesContainerSerie'), document.getElementById('devicesContainerSuMisura')];
+        const [noResultsSerieEl, noResultsSuMisuraEl, noResultsGlobalEl] = [document.getElementById('noResultsSerie'), document.getElementById('noResultsSuMisura'), document.getElementById('noResultsGlobal')];
+        const [toggleSerieEl, toggleSuMisuraEl] = [document.getElementById('toggleSerie'), document.getElementById('toggleSuMisura')];
+        const [devicesContainerSerieWrapperEl, devicesContainerSuMisuraWrapperEl] = [document.getElementById('devicesContainerSerieWrapper'), document.getElementById('devicesContainerSuMisuraWrapper')];
+        const [sortButtonSerie, sortButtonSuMisura] = [document.getElementById('sortButtonSerie'), document.getElementById('sortButtonSuMisura')];
+        const [sortDropdownSerie, sortDropdownSuMisura] = [document.getElementById('sortDropdownSerie'), document.getElementById('sortDropdownSuMisura')];
+        const [exportDataBtn, importDataBtn, importFileIn] = [document.getElementById('exportDataButton'), document.getElementById('importDataButton'), document.getElementById('importFileInput')];
+        const [modalEl, modalTitleEl, modalTextEl, cancelActionBtn, confirmActionBtn] = [document.getElementById('confirmationModal'), document.getElementById('modalTitle'), document.getElementById('modalText'), document.getElementById('cancelActionButton'), document.getElementById('confirmActionButton')];
 
-        const toggleSerieEl = document.getElementById('toggleSerie');
-        const toggleSuMisuraEl = document.getElementById('toggleSuMisura');
-        const devicesContainerSerieWrapperEl = document.getElementById('devicesContainerSerieWrapper');
-        const devicesContainerSuMisuraWrapperEl = document.getElementById('devicesContainerSuMisuraWrapper');
+        let confirmationCallback = null;
+
+        async function initialize() {
+            try {
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        await seedDatabaseIfNeeded();
+                        listenForDeviceChanges();
+                    } else {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error("Errore di inizializzazione Firebase:", error);
+                document.body.innerHTML = "Errore critico durante l'inizializzazione dell'applicazione. Controlla la console.";
+            }
+        }
+
+        async function seedDatabaseIfNeeded() {
+            const q = query(collection(db, devicesCollectionPath));
+            const querySnapshot = await getDocs(q);
+            if (querySnapshot.empty) {
+                console.log("Database vuoto, procedo con il popolamento iniziale...");
+                const batch = writeBatch(db);
+                initialDevicesData.forEach(deviceData => {
+                    const formattedCodici = (deviceData.codiciLEA || []).map(codeStr => {
+                        const parts = codeStr.split(' ');
+                        const codice = parts[0];
+                        const prezzo = parts.slice(1).join(' ');
+                        return { codice: codice || "", descrizione: "", prezzo: prezzo || "" };
+                    });
+                    const newDevice = { ...deviceData, codici: formattedCodici };
+                    delete newDevice.codiciLEA;
+                    const newDocRef = doc(collection(db, devicesCollectionPath));
+                    batch.set(newDocRef, newDevice);
+                });
+                await batch.commit();
+                console.log("Popolamento iniziale completato.");
+            }
+        }
+        
+        function listenForDeviceChanges() {
+            const q = query(collection(db, devicesCollectionPath));
+            onSnapshot(q, (snapshot) => {
+                allDevicesFromDB = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                displayDevices(allDevicesFromDB, searchInputEl.value);
+            });
+        }
         
         function highlightText(text, query) {
             if (!text) return '';
             if (!query || query.length < 1) return text;
             try {
-                // Sanitize query for regex: escape special characters
                 const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(`(${sanitizedQuery})`, 'gi');
-                return text.replace(regex, '<span class="highlight">$1</span>');
-            } catch (e) {
-                console.error("Errore nella regex per l'highlight:", e);
-                return text; // Return original text in case of error
-            }
+                return text.replace(regex, `<span class="highlight">$1</span>`);
+            } catch (e) { console.error("Regex Error:", e); return text; }
         }
-        
-        function createDeviceCard(device, query = "") {
+
+        function createDeviceCard(device) {
             const card = document.createElement('div');
             card.className = 'device-card bg-white p-5 rounded-xl shadow-lg hover:shadow-xl border border-gray-200';
-
-            let marcaHtml = '';
-            if (device.marca && device.marca !== "Non specificata") {
-                marcaHtml = `<p class="text-sm text-sky-600 font-semibold mb-1">Marca: ${highlightText(device.marca, query)}</p>`;
-            } else {
-                marcaHtml = `<p class="text-sm text-gray-500 italic mb-1">Marca non specificata</p>`;
-            }
-
-            const codiciHtml = device.codiciLEA.map(codice =>
-                `<li class="text-xs sm:text-sm text-gray-700">${highlightText(codice, query)}</li>`
-            ).join('');
-
-            let patologieHtml = '';
-            if (device.patologie && device.patologie !== "Non specificata") {
-                patologieHtml = `<p class="text-xs text-gray-500 mt-2">Patologie: ${highlightText(device.patologie, query)}</p>`;
-            }
+            card.dataset.deviceId = device.id;
             
-            let categoriaOrtesiHtml = '';
-            if (device.categoriaOrtesi && device.categoriaOrtesi !== "Non specificata") {
-                 categoriaOrtesiHtml = `<p class="text-xs text-gray-500 mt-1">Categoria: ${highlightText(device.categoriaOrtesi, query)}</p>`;
-            }
+            const viewModeHtml = `
+                <div class="view-mode-field">
+                    <h3 class="text-lg sm:text-xl font-semibold text-gray-800 mb-2">${highlightText(device.prodotto, searchInputEl.value)}</h3>
+                    <p class="text-sm text-sky-600 font-semibold mb-1">Marca: ${highlightText(device.marca, searchInputEl.value)}</p>
+                    <p class="text-sm text-gray-500 mt-1">Categoria: ${highlightText(device.categoriaOrtesi, searchInputEl.value)}</p>
+                    <p class="text-sm text-gray-500 mt-2">Patologie: ${highlightText(device.patologie, searchInputEl.value)}</p>
+                    <p class="text-sm sm:text-md font-medium text-gray-700 mt-3 mb-1">Codici Nuovi LEA:</p>
+                    <ul class="list-disc list-inside space-y-1 text-xs sm:text-sm">
+                        ${(device.codici || []).map(c => `<li><strong>${highlightText(c.codice, searchInputEl.value)}</strong> (${c.prezzo ? highlightText(c.prezzo, searchInputEl.value) + ' €' : 'N/P'}): ${highlightText(c.descrizione || 'N/A', searchInputEl.value)}</li>`).join('')}
+                    </ul>
+                </div>`;
+
+            const editModeHtml = `
+                <div class="edit-mode-field flex-col space-y-2">
+                    <input type="text" value="${device.prodotto}" class="edit-prodotto w-full p-2 border rounded" placeholder="Nome Prodotto">
+                    <input type="text" value="${device.marca}" class="edit-marca w-full p-2 border rounded" placeholder="Marca">
+                    <input type="text" value="${device.categoriaOrtesi}" class="edit-categoria w-full p-2 border rounded" placeholder="Categoria">
+                    <textarea class="edit-patologie w-full p-2 border rounded" placeholder="Patologie">${device.patologie}</textarea>
+                    <h4 class="font-semibold mt-2">Codici LEA</h4>
+                    <div class="edit-codes-container space-y-2 max-h-48 overflow-y-auto pr-2">
+                    ${(device.codici || []).map(c => `
+                        <div class="code-row space-y-1 border-t pt-2 mt-2">
+                            <div class="grid grid-cols-[1fr_120px_auto] gap-2 items-center">
+                                <input type="text" value="${c.codice || ''}" class="edit-codice-val p-1 border rounded" placeholder="Codice LEA">
+                                <input type="text" value="${c.prezzo || ''}" class="edit-prezzo-val p-1 border rounded" placeholder="Prezzo (€)">
+                                <button class="remove-code-btn text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash-alt"></i></button>
+                            </div>
+                            <input type="text" value="${c.descrizione || ''}" class="edit-desc-val w-full p-1 border rounded" placeholder="Descrizione del codice">
+                        </div>`).join('')
+                    }
+                    </div>
+                    <button class="add-code-btn mt-2 text-sm text-sky-600 hover:text-sky-800">+ Aggiungi Codice</button>
+                </div>`;
             
-            let mainContent = `
-                <h3 class="text-lg sm:text-xl font-semibold text-gray-800 mb-2">${highlightText(device.prodotto, query)}</h3>
-                ${marcaHtml}
-                <p class="text-sm sm:text-md font-medium text-gray-700 mt-3 mb-1">Codici Nuovi LEA:</p>
-                <ul class="list-disc list-inside space-y-1 text-xs sm:text-sm">
-                    ${codiciHtml}
-                </ul>
-                ${categoriaOrtesiHtml}
-                ${patologieHtml}
+            const controlsHtml = `
+                <div class="mt-4 flex justify-between items-center">
+                    <div class="view-mode-field">
+                        <button class="edit-btn bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm">Modifica</button>
+                    </div>
+                    <div class="edit-mode-controls space-x-2">
+                        <button class="save-btn bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-sm">Salva</button>
+                        <button class="cancel-btn bg-gray-400 text-white px-3 py-1 rounded hover:bg-gray-500 text-sm">Annulla</button>
+                    </div>
+                    <button class="delete-btn text-gray-400 hover:text-red-500"><i class="fas fa-trash"></i></button>
+                </div>
             `;
-            const contentWrapper = document.createElement('div');
-            contentWrapper.innerHTML = mainContent;
-            card.appendChild(contentWrapper);
+
+            card.innerHTML = `<div class="flex-grow overflow-y-auto pr-2">${viewModeHtml}${editModeHtml}</div>${controlsHtml}`;
+            addCardEventListeners(card, device);
             return card;
         }
 
-        function displayDevices(query = "") {
+        function displayDevices(devices, query = "") {
             const lowerCaseQuery = query.toLowerCase().trim();
             
-            const filteredDevices = allDevicesData.filter(device => {
-                const prodottoMatch = device.prodotto.toLowerCase().includes(lowerCaseQuery);
+            const filteredDevices = devices.filter(device => {
+                const prodottoMatch = device.prodotto && device.prodotto.toLowerCase().includes(lowerCaseQuery);
                 const marcaMatch = device.marca && device.marca.toLowerCase().includes(lowerCaseQuery);
-                const codiciMatch = device.codiciLEA.some(codice => codice.toLowerCase().includes(lowerCaseQuery));
+                const codiciMatch = (device.codici || []).some(c => (c.codice && c.codice.toLowerCase().includes(lowerCaseQuery)) || (c.descrizione && c.descrizione.toLowerCase().includes(lowerCaseQuery)) || (c.prezzo && c.prezzo.toLowerCase().includes(lowerCaseQuery)));
                 const tipoMatch = device.tipoDispositivo && device.tipoDispositivo.toLowerCase().includes(lowerCaseQuery);
                 const categoriaMatch = device.categoriaOrtesi && device.categoriaOrtesi.toLowerCase().includes(lowerCaseQuery);
                 const patologieMatch = device.patologie && device.patologie.toLowerCase().includes(lowerCaseQuery);
                 return prodottoMatch || marcaMatch || codiciMatch || tipoMatch || categoriaMatch || patologieMatch;
             });
 
-            const serieDevices = filteredDevices.filter(d => d.tipoDispositivo === "Di Serie");
-            const suMisuraDevices = filteredDevices.filter(d => d.tipoDispositivo === "Su Misura");
+            let serieDevices = filteredDevices.filter(d => d.tipoDispositivo === "Di Serie");
+            let suMisuraDevices = filteredDevices.filter(d => d.tipoDispositivo === "Su Misura");
+
+            const sortFn = (a, b, key) => (a[key] || '').localeCompare(b[key] || '', 'it', { sensitivity: 'base' });
+            serieDevices.sort((a,b) => sortFn(a, b, currentSort.serie));
+            suMisuraDevices.sort((a,b) => sortFn(a, b, currentSort.suMisura));
 
             devicesContainerSerieEl.innerHTML = '';
             devicesContainerSuMisuraEl.innerHTML = '';
 
-            serieDevices.forEach(device => devicesContainerSerieEl.appendChild(createDeviceCard(device, query)));
-            suMisuraDevices.forEach(device => devicesContainerSuMisuraEl.appendChild(createDeviceCard(device, query)));
-
-            noResultsSerieEl.classList.toggle('hidden', serieDevices.length > 0 || (serieDevices.length === 0 && suMisuraDevices.length > 0 && query !== ""));
-            noResultsSuMisuraEl.classList.toggle('hidden', suMisuraDevices.length > 0 || (suMisuraDevices.length === 0 && serieDevices.length > 0 && query !== ""));
+            serieDevices.forEach(device => devicesContainerSerieEl.appendChild(createDeviceCard(device)));
+            suMisuraDevices.forEach(device => devicesContainerSuMisuraEl.appendChild(createDeviceCard(device)));
             
-            noResultsGlobalEl.classList.toggle('hidden', filteredDevices.length > 0 || query === "");
-
-             if (query === "") {
-                 noResultsSerieEl.classList.add('hidden');
-                 noResultsSuMisuraEl.classList.add('hidden');
+            if (query) {
+                if (serieDevices.length > 0) openSection(toggleSerieEl, devicesContainerSerieWrapperEl);
+                if (suMisuraDevices.length > 0) openSection(toggleSuMisuraEl, devicesContainerSuMisuraWrapperEl);
             }
+
+            noResultsSerieEl.classList.toggle('hidden', serieDevices.length > 0 || query === "");
+            noResultsSuMisuraEl.classList.toggle('hidden', suMisuraDevices.length > 0 || query === "");
+            noResultsGlobalEl.classList.toggle('hidden', filteredDevices.length > 0 || query === "");
+        }
+        
+        function addCardEventListeners(card, device) {
+            const editBtn = card.querySelector('.edit-btn');
+            const saveBtn = card.querySelector('.save-btn');
+            const cancelBtn = card.querySelector('.cancel-btn');
+            const deleteBtn = card.querySelector('.delete-btn');
+            const addCodeBtn = card.querySelector('.add-code-btn');
+
+            editBtn.addEventListener('click', () => card.classList.add('card-editing'));
+            
+            cancelBtn.addEventListener('click', () => card.classList.remove('card-editing'));
+            
+            saveBtn.addEventListener('click', async () => {
+                const updatedDevice = {
+                    prodotto: card.querySelector('.edit-prodotto').value,
+                    marca: card.querySelector('.edit-marca').value,
+                    categoriaOrtesi: card.querySelector('.edit-categoria').value,
+                    patologie: card.querySelector('.edit-patologie').value,
+                    tipoDispositivo: device.tipoDispositivo,
+                    codici: Array.from(card.querySelectorAll('.code-row')).map(row => ({
+                        codice: row.querySelector('.edit-codice-val').value,
+                        prezzo: row.querySelector('.edit-prezzo-val').value,
+                        descrizione: row.querySelector('.edit-desc-val').value,
+                    }))
+                };
+                
+                const docRef = doc(db, devicesCollectionPath, device.id);
+                await updateDoc(docRef, updatedDevice);
+                card.classList.remove('card-editing');
+            });
+            
+            deleteBtn.addEventListener('click', () => {
+                openConfirmationModal('Conferma Eliminazione', 'Sei sicuro di voler eliminare questo dispositivo?', () => {
+                    deleteDoc(doc(db, devicesCollectionPath, device.id));
+                });
+            });
+            
+            addCodeBtn.addEventListener('click', () => {
+                const codesContainer = card.querySelector('.edit-codes-container');
+                const codeRow = document.createElement('div');
+                codeRow.className = "code-row space-y-1 border-t pt-2 mt-2";
+                codeRow.innerHTML = `
+                    <div class="grid grid-cols-[1fr,120px,auto] gap-2 items-center">
+                        <input type="text" class="edit-codice-val p-1 border rounded" placeholder="Codice LEA">
+                        <input type="text" class="edit-prezzo-val p-1 border rounded" placeholder="Prezzo (€)">
+                        <button class="remove-code-btn text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <input type="text" class="edit-desc-val w-full p-1 border rounded" placeholder="Descrizione del codice">`;
+                codesContainer.appendChild(codeRow);
+                codeRow.querySelector('.remove-code-btn').addEventListener('click', (e) => e.currentTarget.closest('.code-row').remove());
+            });
+
+            card.querySelectorAll('.remove-code-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => e.currentTarget.closest('.code-row').remove());
+            });
+        }
+        
+        async function handleAddNewDevice(tipo) {
+            const newDevice = {
+                prodotto: "Nuovo Dispositivo",
+                marca: "",
+                categoriaOrtesi: "",
+                patologie: "",
+                codici: [{ codice: "", descrizione: "", prezzo: "" }],
+                tipoDispositivo: tipo
+            };
+            await addDoc(collection(db, devicesCollectionPath), newDevice);
+        }
+
+        function openConfirmationModal(title, text, callback) {
+            modalTitleEl.textContent = title;
+            modalTextEl.textContent = text;
+            modalEl.style.display = 'flex';
+            confirmationCallback = callback;
+        }
+
+        function closeConfirmationModal() {
+            modalEl.style.display = 'none';
+            confirmationCallback = null;
+        }
+        
+        function openSection(toggleElement, containerWrapperElement) {
+            if (containerWrapperElement.classList.contains('hidden')) {
+                containerWrapperElement.classList.remove('hidden');
+                toggleElement.classList.remove('collapsed');
+            }
+        }
+
+        function setupAdvancedTools() {
+            const setupSort = (btn, dropdown, type) => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    sortDropdownSerie.style.display = 'none';
+                    sortDropdownSuMisura.style.display = 'none';
+                    dropdown.style.display = 'block';
+                });
+                dropdown.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('sort-option')) {
+                        currentSort[type] = e.target.dataset.sortBy;
+                        displayDevices(allDevicesFromDB, searchInputEl.value);
+                        dropdown.style.display = 'none';
+                    }
+                });
+            };
+            setupSort(sortButtonSerie, sortDropdownSerie, 'serie');
+            setupSort(sortButtonSuMisura, sortDropdownSuMisura, 'suMisura');
+            document.addEventListener('click', () => {
+                sortDropdownSerie.style.display = 'none';
+                sortDropdownSuMisura.style.display = 'none';
+            });
+
+            exportDataBtn.addEventListener('click', () => {
+                const dataStr = JSON.stringify(allDevicesFromDB, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                const exportFileDefaultName = `lea_backup_${new Date().toISOString().slice(0,10)}.json`;
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            });
+
+            importDataBtn.addEventListener('click', () => importFileIn.click());
+            importFileIn.addEventListener('change', (event) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    openConfirmationModal(
+                        'Conferma Importazione Dati',
+                        'ATTENZIONE: Stai per sovrascrivere tutti i dati esistenti. Questa azione è irreversibile. Procedere?',
+                        async () => {
+                            try {
+                                const importedData = JSON.parse(e.target.result);
+                                if (!Array.isArray(importedData)) throw new Error("Il file non è un array valido.");
+                                const deleteBatch = writeBatch(db);
+                                allDevicesFromDB.forEach(device => {
+                                    deleteBatch.delete(doc(db, devicesCollectionPath, device.id));
+                                });
+                                await deleteBatch.commit();
+                                const addBatch = writeBatch(db);
+                                importedData.forEach(device => {
+                                    const { id, ...deviceData } = device;
+                                    const newDocRef = doc(collection(db, devicesCollectionPath));
+                                    addBatch.set(newDocRef, deviceData);
+                                });
+                                await addBatch.commit();
+                                console.log("Dati importati con successo.");
+                            } catch (err) {
+                                console.error("Errore durante l'importazione:", err);
+                                alert("Errore: Il file non è valido o il formato non è corretto.");
+                            }
+                        }
+                    );
+                };
+                reader.readAsText(event.target.files[0]);
+                event.target.value = '';
+            });
         }
         
         function setupCollapsibleSections() {
-            // Funzione per gestire il toggle di una singola sezione
             const toggleSection = (toggleElement, containerWrapperElement) => {
                 containerWrapperElement.classList.toggle('hidden');
                 toggleElement.classList.toggle('collapsed');
             };
-
-            // Aggiungi event listener
             toggleSerieEl.addEventListener('click', () => toggleSection(toggleSerieEl, devicesContainerSerieWrapperEl));
             toggleSuMisuraEl.addEventListener('click', () => toggleSection(toggleSuMisuraEl, devicesContainerSuMisuraWrapperEl));
 
-            // Imposta le sezioni come collassate all'inizio
             if (!devicesContainerSerieWrapperEl.classList.contains('hidden')) {
                 toggleSection(toggleSerieEl, devicesContainerSerieWrapperEl);
             }
@@ -351,14 +601,19 @@
                 toggleSection(toggleSuMisuraEl, devicesContainerSuMisuraWrapperEl);
             }
         }
-
-        searchInputEl.addEventListener('input', function() {
-            displayDevices(this.value);
+        
+        document.getElementById('addDeviceSerie').addEventListener('click', () => handleAddNewDevice('Di Serie'));
+        document.getElementById('addDeviceSuMisura').addEventListener('click', () => handleAddNewDevice('Su Misura'));
+        searchInputEl.addEventListener('input', () => displayDevices(allDevicesFromDB, searchInputEl.value));
+        cancelActionBtn.addEventListener('click', closeConfirmationModal);
+        confirmActionBtn.addEventListener('click', () => {
+            if (confirmationCallback) confirmationCallback();
+            closeConfirmationModal();
         });
 
-        // Inizializzazione
-        displayDevices(); // Mostra tutti i dispositivi (ma le sezioni saranno collassate)
-        setupCollapsibleSections(); // Imposta le sezioni come collassate e aggiunge i listener
+        initialize();
+        setupCollapsibleSections();
+        setupAdvancedTools();
     </script>
 </body>
 </html>

@@ -122,142 +122,23 @@
     <script type="module">
         // Importa le funzioni di Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, doc, getDocs, addDoc, updateDoc, deleteDoc, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Variabili Globali ---
         let db, auth, userId;
         let allDevicesFromDB = []; // Cache locale dei dispositivi
         let currentSort = { serie: 'prodotto', suMisura: 'prodotto' }; // Stato di ordinamento
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const appId = "codifiche-lea"; // Sostituito con il tuo projectId per coerenza
         const devicesCollectionPath = `/artifacts/${appId}/public/data/devices`;
         
         // Dati iniziali per popolare il database la prima volta
         const initialDevicesData = [
-          // --- DISPOSITIVI DI SERIE (dal PDF ORTESI_DI_SERIE.pdf) ---
-          { prodotto: "Spry Step Max / Toe off (Tutore gamba piede in carbonio)", marca: "Thuasne", codiciLEA: ["06.12.06.018 760"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente;" },
-          { prodotto: "Spry Step / Walk on (Tutore gamba piede in carbonio)", marca: "thuasne ottobock", codiciLEA: ["06.12.06.018 760"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente;" },
-          { prodotto: "Dynamic Walk (Tutore gamba piede in carbonio)", marca: "Centri", codiciLEA: ["06.12.06.018 760"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente;" },
-          { prodotto: "Pero-Med (Tutore gamba piede basso)", marca: "Thuasne", codiciLEA: ["06.12.06.033 90"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Patologie neurologiche; Tutore per piede cadente; Piede flaccido; Paresi peroneale;" },
-          { prodotto: "Af Servo (Tutore gamba piede basso)", marca: "Smart reha", codiciLEA: ["061206042 111", "061291424 70", "061291517 21"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Ictus, lesioni della colonna, charcot-marie-tooth" },
-          { prodotto: "Dictus (Tutore gamba piede basso)", marca: "Podartis", codiciLEA: ["061206039 93", "061291218 87"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "equinismi spastici di media entità, cadute flaccide del piede" },
-          { prodotto: "Malleo Neurexa (Tutore gamba piede basso)", marca: "Ottobock", codiciLEA: ["061206042 111", "061291424 70", "061291436 21,30"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "ictus, sclerosi multipla, patologie neurologiche" },
-          { prodotto: "Push ortho (Tutore gamba piede basso flessibile)", marca: "Eumedica", codiciLEA: ["061206036 435", "061291517 21"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Ridotto controllo dei muscoli elevatori del piede, instabilità di caviglia" },
-          { prodotto: "Lift Foot (tutore gamba piede in elastico)", marca: "itop", codiciLEA: ["06.12.06.045 160", "06.12.91.436 21,30"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortedi Afo", patologie: "Piede cadente" },
-          { prodotto: "Saebo Step (Tutore gamba piede basso)", marca: "Saebo", codiciLEA: ["061206036 435", "aggiuntivi per step kit barefoot: 061291424, 061291517"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi AFO", patologie: "Piede cadente" },
-          { prodotto: "Air Soft (Tutore palmare per mano- polso)", marca: "Tielle", codiciLEA: ["060613009 345"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Lesioni neurologiche dell'arto superiore con conseguenti paralisi spastiche o flaccide dell'arto superiore."},
-          { prodotto: "Saebo Strech (Tutore palmare statico)", marca: "Saebo", codiciLEA: ["06.06.13.012 390", "06.06.91.103 62,40", "06.06.91.112 23", "06.06.91.106 125,80"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Lesioni neurologiche dell'arto superiore con conseguenti paralisi spastiche."},
-          { prodotto: "Saebo Glove (Guanto)", marca: "Saebo", codiciLEA: ["Non specificato nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "lesioni neurologiche e ortopediche"},
-          { prodotto: "Ginocchiera steccata", marca: "Non specificata", codiciLEA: ["Non specificato nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi coscia gamba", patologie: "Lesioni a carico dei legamenti e meniscali"},
-          { prodotto: "Ginocchiera articolata", marca: "Non specificata", codiciLEA: ["Non specificato nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi coscia gamba", patologie: "Lesioni a carico dei legamenti e meniscali"},
-          { prodotto: "Check (Ginocchiera per Recurvato)", marca: "Tielle", codiciLEA: ["06.12.09.036 435"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi coscia gamba", patologie: "iperestensione di ginocchio"},
-          { prodotto: "Tutore Articolato di gomito", marca: "Tielle", codiciLEA: ["06.06.15.018*"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "fratture composte di gomito, lussazione o sub-lussazione del gomito"},
-          { prodotto: "Tutore Di spalla", marca: "Tielle", codiciLEA: ["06.06.30.033*"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Spalla cadente"},
-          { prodotto: "Minerva/ Headmaster (Collare Rigido)", marca: "Tielle", codiciLEA: ["Non specificato nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi cervicale", patologie: "Instabilità del tratto cervicale dovuta a patologie neurologiche (S.L.A.)"},
-          { prodotto: "Toe walking", marca: "Non specificata", codiciLEA: ["061203051 145,60 (x2)", "061291523 173,90 (x2)", "+ calzature non contemplate"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Plantari e scarpe", patologie: "toe walking idiopatico (cammino sulle punte)"},
-          { prodotto: "Spinfast (Busto in stoffa rigidi con spallacci)", marca: "TLM", codiciLEA: ["060309012(donna) 340", "060309009(uomo) 310", "060391124 41,50", "060391130 29,70"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "Osteoporosi, decorso post operatorio, post trauma, cedimenti vertebrali."},
-          { prodotto: "Ipertex/ Crossover (Busto in stoffa con spallacci)", marca: "TLM", codiciLEA: ["060309003 (uomo) 260", "060309006 (DONNA) 270", "060391121 34,30"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "osteoporosi, artrosi lombare, ipercifosi, post trauma"},
-          { prodotto: "C35 (Busto per iperestensione)", marca: "Tielle", codiciLEA: ["06.03.09.113 229"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinali", patologie: "fratture e cedimenti vertebrali"},
-          { prodotto: "Summer, 555, 500W (Busto in stoffa lombare)", marca: "TLM", codiciLEA: ["060309003 (UOMO) 260", "060309006 (DONNA) 270"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "osteoporosi, artrosi lombare"},
-          { prodotto: "MZ (Busto crocera rigida)", marca: "Non specificata", codiciLEA: ["060309047 844,80"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinali", patologie: "Non specificata"},
-          { prodotto: "Busto Boston (Busto per scoliosi)", marca: "Non specificata", codiciLEA: ["060309092 1073,40", "opzionale placca: 060391403"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "busto CLB (Busto per scoliosi)", marca: "Non specificata", codiciLEA: ["060309071 1106,80"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Busto cheneau (busto per scoliosi)", marca: "Non specificata", codiciLEA: ["060309077 950"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Busto lionese (Busto scoliosi)", marca: "Non specificata", codiciLEA: ["060309059 1598"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Busto lionese per dorso curvo (Busto scoliosi)", marca: "Non specificata", codiciLEA: ["060309062 1619,60"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Busto Sforzesco (Busto scoliosi)", marca: "Non specificata", codiciLEA: ["060309080 1509,10"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Vacuum Bell (Dispositivo per Petto escavato)", marca: "Non specificata", codiciLEA: ["060309077 950", "060391406 90"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "petto escavato"},
-          { prodotto: "Busto Milwaukee (Busto scoliosi)", marca: "Non specificata", codiciLEA: ["060318003 1044,70", "opzionali: 060391603, 060391606"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi Spinali", patologie: "scoliosi idiopatica giovanile"},
-          { prodotto: "Corsetto compressivo dinamico (CDC) (Busto scoliosi)", marca: "Non specificata", codiciLEA: ["60309110 570", "060391403 140"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi Spinali", patologie: "petto carenato"},
-          { prodotto: "Busto statico equilibrato", marca: "Non specificata", codiciLEA: ["060318033", "060391709", "numerosi opzionali"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Ortesi spinali", patologie: "Non specificata"},
-          { prodotto: "Scarpa di serie (Scarpe di serie e plantari per adulti)", marca: "Non specificata", codiciLEA: ["Vedere codici opzionali associati nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "artrosi del piede, artrite reumatoide, piede diabetico prevenzione primaria"},
-          { prodotto: "Scarpa di serie pediatrica (scarpe di serie e plantari per bambini)", marca: "Non specificata", codiciLEA: ["Vedere codici opzionali associati nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "piede valgo piatto, ginocchio valgo"},
-          { prodotto: "Bebax (Tutore per piede)", marca: "Tielle", codiciLEA: ["06.12.06.051 380", "opzionale asta: 061291430 N.L."], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "malformazioni dell'avampiede, metatarso varo-addotto-supinato, Post operatorio"},
-          { prodotto: "Ponseti (Tutore per piede)", marca: "Tielle", codiciLEA: ["06.12.15.021 1150", "opzionale asta: 061291430 N.L."], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "piede torto congenito"},
-          { prodotto: "Molla di Codivilla (tutore gamba piede)", marca: "Tielle", codiciLEA: ["061206042 111"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "piede cadente"},
-          { prodotto: "Coxaflex / hipp med (Tutore per anca)", marca: "thuasne", codiciLEA: ["Non specificato nel PDF"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi d'anca", patologie: "Displasia congenita dell'anca"},
-          { prodotto: "Coxa Fix (tutore d'anca)", marca: "Tielle", codiciLEA: ["06.12.15.012 720", "06.12.91.490 300"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortedi d'anca", patologie: "Artroplastica totale d'anca, fratture non consolidate del collo del femore, instabilità complesse dell'articolazione dell'anca."},
-          { prodotto: "Plantari termoformabile", marca: "Non specificata", codiciLEA: ["06.12.03.024 84,10 (x2)", "06.12.91.103 1 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Plantari con talloniera avvolgente in multiform", marca: "Non specificata", codiciLEA: ["06.12.03.030 104 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Plantari con sistema Cad Cam", marca: "Non specificata", codiciLEA: ["06.12.03.042 138,40 (x2)", "06.12.91.103 1 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "plantari sensomotori", marca: "Non specificata", codiciLEA: ["061203042 138,40 (x2)", "061291103 1 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Piede piatto valgo"},
-          { prodotto: "plantari su Calco gessato", marca: "Non specificata", codiciLEA: ["061203051 145,60 (x2)", "061291103 1 (x2)", "061291106 13,50 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "piede diabetico, piede deforme"},
-          { prodotto: "Rialzo fino a 4 cm", marca: "Non specificata", codiciLEA: ["061203075 71,40"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Eterometria arti inferiori"},
-          { prodotto: "rialzo da 4 a 8 cm", marca: "Non specificata", codiciLEA: ["061203078 83"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Eterometria arti inferiori"},
-          { prodotto: "rialzo oltre gli 8 cm", marca: "Non specificata", codiciLEA: ["061203081 88,90"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Eterometria arti inferiori"},
-          { prodotto: "Saebo step kit barefoot (ortesi di caviglia piede)", marca: "Non specificata", codiciLEA: ["061206036 435", "061291424 70", "061291517 21"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Hypex lite adulto/pediatrico (ortesi di ginocchio)", marca: "Albrecht", codiciLEA: ["061209024 595"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "ortesi di ginocchio jack PCL", marca: "Albrecht", codiciLEA: ["061209018 605", "061291230 46,50", "061291466 290 (x2)", "061291436 21,30 (x3)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Elbow track (ortesi di gomito)", marca: "Albrecht", codiciLEA: ["060615018 575,90", "060691203 285,70"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Non specificata"},
-          { prodotto: "CDS Knee brece flex/ext (ortesi di ginocchio dinamico)", marca: "Albrecht", codiciLEA: ["061209018 605", "061291466 290 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "CDS Knee brece amputation (ortesi di ginocchio dinamico)", marca: "Albrecht", codiciLEA: ["061209018 605", "061291466 290 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "CDS Ankle brace (ortesi gamba piede)", marca: "Albrecht", codiciLEA: ["061206027 543", "061291412 120 (x2)", "061291424 70", "061203024 84,10", "061291227 28", "061291505 80"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "CDS Elbow brace flex/ext (ortesi di gomito)", marca: "Albrecht", codiciLEA: ["060615018 605", "060691206 170", "060691203 285,70"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesiarto superiore", patologie: "Non specificata"},
-          { prodotto: "CDS Wrist brace flex/ext (ortesi di polso dinamica)", marca: "Albrecht", codiciLEA: ["060613015 520", "060691103 62,40", "060691203 285,70", "060691106 125,50", "060691112 23"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Non specificata"},
-          { prodotto: "MKS lumbago plus (corsetto lombare)", marca: "Albrecht", codiciLEA: ["060309003 260", "opzionale: 60309006"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinale", patologie: "Non specificata"},
-          { prodotto: "MKS Pontsana mobil (corsetto lombare)", marca: "Albrecht", codiciLEA: ["060309018 290", "opzionale: 60309015"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinale", patologie: "Non specificata"},
-          { prodotto: "MKS Pontsana stabil (corsetto lombare)", marca: "Albrecht", codiciLEA: ["060309024 350", "060391115 6,90 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinale", patologie: "Non specificata"},
-          { prodotto: "MKS Osteo plus (corsetto toraco lombare)", marca: "Albrecht", codiciLEA: ["060309021", "060391106", "060391121 (x2)", "060391115 (x2)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi spinale", patologie: "Non specificata"},
-          { prodotto: "Guanto robotico", marca: "Non specificata", codiciLEA: ["060613012 390", "060691103 62,40", "060691118 26,80", "060691106 125,50", "060691112 23 (x5)"], tipoDispositivo: "Di Serie", categoriaOrtesi: "ortesi arto superiore", patologie: "Non specificata"},
-          
-          // --- DISPOSITIVI SU MISURA (dal PDF ORTESI_SU_MISURA.pdf) ---
-          { prodotto: "Tutore gamba piede e T3-T4-T5", marca: "Non specificata", codiciLEA: ["06.12.06.027 543", "06.12.91.436 21,30 (x2)", "06.12.91.517 21"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi arto inferiori", patologie: "Paralisi cerebrali infantili, patologie neuromuscolari." },
-          { prodotto: "Tutore nancy hilton T2", marca: "Non specificata", codiciLEA: ["06.12.06.036 435", "06.12.91.517 21"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi arto inferiore", patologie: "Paralisi cerebrali infantili, patologie neuromuscolari." },
-          { prodotto: "Atlanta (Tutore Bacino coscia)", marca: "Non specificata", codiciLEA: ["06.12.15.009 1000", "06.12.91.493 470 (x2)", "06.12.91.508 75", "06.12.91.511 95", "06.12.91.436 21,30 (x4)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi d'anca", patologie: "Morbo di Perthes" },
-          { prodotto: "Swash (Tutore bacino coscia)", marca: "Non specificata", codiciLEA: ["06.12.15.009 1000", "06.12.91.236 80", "06.12.91.436 21,30 (x4)", "06.12.91.484 190 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi per anca", patologie: "Non specificata"},
-          { prodotto: "Doccia Gamba piede", marca: "Non specificata", codiciLEA: ["06.12.06.003 385", "06.12.91.218 55 (x3)", "06.12.91.227 40,50"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi arto inferiore", patologie: "Post operatorio, contenzione notturna."},
-          { prodotto: "CaMO (Tutore Gamba piede a balestra)", marca: "Non specificata", codiciLEA: ["06.12.06.027 543", "06.12.91.436 21,30 (x2)", "06.12.91.418 70 (x6)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi arto inferiore", patologie: "Paralisi cerebrali infantili, mielomeningocele, stroke, forme diplegiche, tetraplegiche o emiplegiche"},
-          { prodotto: "Doccia coscia gamba piede gin. Esteso", marca: "Non specificata", codiciLEA: ["06.12.12.003 549", "06.12.91.218 87,50 (x2)", "06.12.91.239 80", "06.12.91.221 50"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Non specificata", patologie: "Patologie neuromuscolari e mielomeningocele per lieve flessione del ginocchio."},
-          { prodotto: "Doccia coscia gamba piede gin. Flesso", marca: "Non specificata", codiciLEA: ["06.12.12.012 487", "06.12.91.218* 87.50 (x2)", "06.12.91.239 80"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Piede Torto Congenito, Tibia Vara."},
-          { prodotto: "Tutore Coscia Gamba Piede", marca: "Non specificata", codiciLEA: ["06.12.12.048 1950", "06.12.91.499 66,50", "06.12.91.433 40", "06.12.91.436 21,30 (x4)", "06.12.91.517 21", "06.12.91.457 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi Arti inferiori", patologie: "Esiti di PAA, emiplegie, diplegie, mielomeningocole, paralisi cerebrale infantile."},
-          { prodotto: "RGO (Tutore Tronco - anca - coscia -gamba - piede)", marca: "Non specificata", codiciLEA: ["06.12.18.015 5920", "06.12.91.493 470 (x2)", "06.12.91.457 225 (x4)", "06.12.91.430 30 (x2)", "06.12.91.439 142,40 (x2)", "06.12.91.436 21,30 (x8)", "06.12.91.445 31,10 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi tronco- arti inferiori.", patologie: "Lesioni midollari, paraplegie congenite patologiche, spina bifida, poliomielite, distrofia muscolare, mielomeningocele."},
-          { prodotto: "Neuro Swing (fior e gentz) (Tutore Gamba piede articolato in carbonio)", marca: "Non specificata", codiciLEA: ["06.12.06.027 543", "06.12.91.514 50", "06.12.91.433 40", "06.12.91.439 142,40", "06.12.91.418 70 (x25)", "06.12.91.445* 31,10", "06.12.91.412 120 (x2)", "06.12.91.424 70", "06.12.91.523 173,90"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Paralisi cerebrali infantili, mielomeningocele e lesioni midollari livello S1-S2- forme diplegiche distali o prossimali, emiplegie, stroke, ТВІ."},
-          { prodotto: "Neuro swing (kafo) (Tutore Coscia Gamba Piede)", marca: "Non specificata", codiciLEA: ["06.12.12.048 1950", "06.12.91.499 66,50", "06.12.91.433 40", "06.12.91.436 21,30 (x4)", "06.12.91.517 21", "06.12.91.463 260", "06.12.91.439 142,40", "06.12.91.418 70 (x50)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi Arti inferiori", patologie: "Limitazione degli estensori di ginocchio"},
-          { prodotto: "Salera (Tutore Tronco - anca - coscia -gamba - piede)", marca: "Non specificata", codiciLEA: ["06.12.12.048 1500 (x2)", "06.12.91.424 70 (x2)", "06.12.91.517 21 (x2)", "06.12.91.430 30 (x2)", "06.12.91.433 40 (x2)", "06.12.91.436* 21,30 (x6)", "06.12.91.439 142,40 (x2)", "06.12.91.445* (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi tronco- arti inferiori.", patologie: "Mielomeningocele e lesioni midollari corrispondenti o superiori al livello L2-L3."},
-          { prodotto: "Doccia di posizione avambraccio- mano", marca: "Non specificata", codiciLEA: ["06.06.13.018 325", "06.06.91.106 125,50 (x2)", "06.06.91.215 25"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi arto superiore", patologie: "Mantenimento mano in posizione funzionale, caduta in flessione flaccida o spastica, trattamento deformità."},
-          { prodotto: "Tutore d'anca (Swash)", marca: "Swash", codiciLEA: ["06.12.15.042 760x2 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi d'anca", patologie: "Non specificata"},
-          { prodotto: "Scarpe su misura basse per plantari", marca: "Non specificata", codiciLEA: ["06.33.07.003 (x2)", "06.33.91.148 (x2)", "06.12.03.042 (x2)", "06.12.91.103 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe su misura alte per plantari", marca: "Non specificata", codiciLEA: ["06.33.07.006 (x2)", "06.33.91121 (x2)", "06.33.91.148 (x2)", "06.12.03.042 (x2)", "06.12.91.103 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe di rivestimento su misura bassa", marca: "Non specificata", codiciLEA: ["06.33.21.009 (x2)", "06.33.91.148 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Non specificata", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe di rivestimento su misura alta", marca: "Non specificata", codiciLEA: ["06.33.21.012 (x2)", "063391121 (x2)", "06.33.91.148 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Non specificata", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe di rivestimento su misura bassa con rialzo fino a 2 cm", marca: "Non specificata", codiciLEA: ["06.33.21.021 (x2)", "06.33.91.148 (x2)", "063391106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe di rivestimento su misura alta con rialzo fino a 2 cm", marca: "Non specificata", codiciLEA: ["06.33.21.024 (x2)", "063391124 (x2)", "06.33.91.148 (x2)", "063391106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Deformità del piede"},
-          { prodotto: "Scarpe di rivestimento su misura alta con rialzo da 2 a 4 cm", marca: "Non specificata", codiciLEA: ["06.33.21.030 (x2)", "063391121 (x2)", "06.33.91.148 (x2)", "06.33.91.118 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "deformità del piede, eterometria arti inferiore"},
-          { prodotto: "Scarpe di rivestimento su misura alta Con rialzo da 4 a 8 cm", marca: "Non specificata", codiciLEA: ["06.33.21.033 (x2)", "063391121 (x2)", "06.33.91.148 (x2)", "06.33.91.118 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "deformità del piede, eterometria arti inferiore"},
-          { prodotto: "Scarpe di rivestimento su misura alta Con rialzo oltre gli 8 cm", marca: "Non specificata", codiciLEA: ["06.33.21.036 (x2)", "063391121 (x2)", "06.33.91.148 (x2)", "06.33.91.118 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "deformità del piede, eterometria arti inferiori"},
-          { prodotto: "Calzature su misura per patologie complesse Piede equino, varo, supinato, addotto", marca: "Non specificata", codiciLEA: ["06.33.05.003 (x2)", "06.33.91.106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Ortesi arto inferiori", patologie: "Non specificata"},
-          { prodotto: "Calzatura su misura con avampiede bassa", marca: "Non specificata", codiciLEA: ["06.33.05.006 (x2)", "06.33.91.148 (x2)", "06.12.03.042 (x2)", "06.12.91.103 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Non specificata", patologie: "Non specificata"},
-          { prodotto: "Calzatura su misura con avampiede alta", marca: "Non specificata", codiciLEA: ["06.33.05.009 (x2)", "063391121 (x2)", "06.33.91.148 (x2)", "06.12.03.042 (x2)", "06.12.91.103 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Non specificata", patologie: "Non specificata"},
-          { prodotto: "Protesi Provvisoria Modulare transtibiale", marca: "Non specificata", codiciLEA: ["06.24.09.033", "06.24.91.121", "062491239", "06.24.91.224", "06.24.91.242", "06.24.91.233"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi definitiva Modulare Transtibiale", marca: "Non specificata", codiciLEA: ["06.24.09.039", "06.24.91.224", "06.24.91.239", "06.24.91.242", "06.24.91.233", "062491121"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi modulare Transtibiale da bagno", marca: "Non specificata", codiciLEA: ["06.24.09.045", "06.24.91.224", "06.24.91.239", "06.24.91.242", "06.24.91.233", "06.24.91.121"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi modulare provvisoria Transfermorale", marca: "Non specificata", codiciLEA: ["06.24.15.030", "06.24.91.224 (x2)", "062491121", "06.24.91.330", "06.24.91.245", "06.24.91.324"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfemorale definitiva", marca: "Non specificata", codiciLEA: ["06.24.15.036", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio monocentrico...", marca: "Non specificata", codiciLEA: ["06.24.15.042", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio policentrico...", marca: "Non specificata", codiciLEA: ["06.24.15.048", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio idraulico o pneumatico...", marca: "Non specificata", codiciLEA: ["06.24.15.054", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio polifunzionale monocentrico a frizione...", marca: "Non specificata", codiciLEA: ["06.24.15.057", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio polifunzionale policentrico pneumatico...", marca: "Non specificata", codiciLEA: ["06.24.15.060", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio polifunzionale monocentrico con freno automatico...", marca: "Non specificata", codiciLEA: ["06.24.15.063", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Transfermorale Definitiva con invasatura con aderenza totale e tenuta pneumatica: ginocchio con bloccaggio manuale in acciaio...", marca: "Non specificata", codiciLEA: ["06.24.15.069", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi Modulare Definitiva transfemorale da bagno", marca: "Non specificata", codiciLEA: ["06.24.15.081", "06.24.91.224", "06.24.91.339", "06.24.91.330", "06.24.91.245", "06.24.91.324", "062491124", "062491106"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto inferiore", patologie: "Non specificata"},
-          { prodotto: "Protesi estetica transradiale", marca: "Non specificata", codiciLEA: ["061809018 1413,20", "061891109 106,00", "061891115 197,50"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto superiore", patologie: "Non specificata"},
-          { prodotto: "Protesi mioelettrica transradiale", marca: "Non specificata", codiciLEA: ["61809069", "061891109", "061891115"], tipoDispositivo: "Su Misura", categoriaOrtesi: "protesi arto superiore", patologie: "Non specificata"},
-          { prodotto: "Tutore elastico S.El.Li per pollice dita escluse (Palmare)", marca: "Non specificata", codiciLEA: ["06.06.13.015", "06.06.91.106"], tipoDispositivo: "Su Misura", categoriaOrtesi: "arto superiore", patologie: "Paramorfismi e dismorfismi di tipo neurogeno e neuromuscolare, in presenza di un deficit di tipo posturale."},
-          { prodotto: "Tutore Elastico S.EI.Li per polso con pollice e dita escluse (Palmare)", marca: "Non specificata", codiciLEA: ["06.06.13.015", "06.06.91.106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "arto superiore", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li per avambraccio polso, mano e dita (Palmare)", marca: "Non specificata", codiciLEA: ["06.06.13.012", "06.06.91.106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "arto superiore", patologie: "Non specificata"},
-          { prodotto: "tutore elastico S. El. Li per gomito e avambraccio (gomitiera)", marca: "Non specificata", codiciLEA: ["06.06.12.003"], tipoDispositivo: "Su Misura", categoriaOrtesi: "arto superiore", patologie: "Non specificata"},
-          { prodotto: "tutore elastico S. El. Li per avambraccio polso mano (tutore avambraccio mano)", marca: "Non specificata", codiciLEA: ["06.06.13.012", "06.06.91.106 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "arto superiore", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li di tronco con spalle incluse (tutore di tronco)", marca: "Non specificata", codiciLEA: ["06.03.18.033"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li di tronco con spalle incluse e prolungamento sacro ischiatica (tutore di tronco)", marca: "Non specificata", codiciLEA: ["06.03.18.033", "06.03.91.715"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li di tronco con presa scapolo-omerale (tutore di tronco)", marca: "Non specificata", codiciLEA: ["06.03.18.033", "06.03.91.721 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li di tronco con presa scapolo-omerale e prolungamento sacro ischiatico (tutore di tronco)", marca: "Non specificata", codiciLEA: ["06.03.18.033", "06.03.91.715", "06.03.91.721 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore elastico S. El. Li di tronco con prolungamento alle cosce (tutore di tronco)", marca: "Non specificata", codiciLEA: ["06.03.18.033", "06.03.91.715", "06.03.91.718"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li di tronco con presa scapolo-omerale e prolungamento sacro ischiatico (con prolungamento alle cosce)", marca: "Non specificata", codiciLEA: ["06.03.18.033", "06.03.91.715", "06.03.91.718", "06.03.91.724 (x2)"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi di tronco", patologie: "Non specificata"},
-          { prodotto: "Tutore Elastico S. El. Li abduttore per bacino e cosce (tutore bacino)", marca: "Non specificata", codiciLEA: ["06.12.15.009"], tipoDispositivo: "Su Misura", categoriaOrtesi: "ortesi d'anca", patologie: "Non specificata"}
+            { prodotto: "Esempio Dispositivo di Serie", marca: "Marca Esempio", codiciLEA: ["01.01.01.001 100"], tipoDispositivo: "Di Serie", categoriaOrtesi: "Categoria Esempio", patologie: "Patologia Esempio" },
+            { prodotto: "Esempio Dispositivo su Misura", marca: "Marca Esempio", codiciLEA: ["02.02.02.002 200"], tipoDispositivo: "Su Misura", categoriaOrtesi: "Categoria Esempio", patologie: "Patologia Esempio" }
         ];
 
-        // --- Elementi DOM e resto dello script (invariato)
+        // --- Elementi DOM ---
         const searchInputEl = document.getElementById('searchInput');
         const [devicesContainerSerieEl, devicesContainerSuMisuraEl] = [document.getElementById('devicesContainerSerie'), document.getElementById('devicesContainerSuMisura')];
         const [noResultsSerieEl, noResultsSuMisuraEl, noResultsGlobalEl] = [document.getElementById('noResultsSerie'), document.getElementById('noResultsSuMisura'), document.getElementById('noResultsGlobal')];
@@ -270,10 +151,22 @@
 
         let confirmationCallback = null;
 
+        // --- Inizializzazione Firebase ---
         async function initialize() {
             try {
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                // Your web app's Firebase configuration
+                const firebaseConfig = {
+                    apiKey: "AIzaSyDW0Bl90TBc-MkRfK7aF4tpe3TxqWjQpuU",
+                    authDomain: "codifiche-lea.firebaseapp.com",
+                    projectId: "codifiche-lea",
+                    storageBucket: "codifiche-lea.appspot.com",
+                    messagingSenderId: "416568271465",
+                    appId: "1:416568271465:web:c309850e9a2608fe7938f8"
+                };
+
+                // Initialize Firebase
                 const app = initializeApp(firebaseConfig);
+
                 db = getFirestore(app);
                 auth = getAuth(app);
                 
@@ -283,19 +176,24 @@
                         await seedDatabaseIfNeeded();
                         listenForDeviceChanges();
                     } else {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
+                        try {
                             await signInAnonymously(auth);
+                        } catch (error) {
+                            console.error("Errore durante l'accesso anonimo:", error);
+                            if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/configuration-not-found') {
+                                alert("ERRORE CRITICO: Accesso Anonimo non abilitato nel progetto Firebase.\n\nPer risolvere:\n1. Vai alla tua console Firebase.\n2. Vai su 'Authentication' > 'Sign-in method'.\n3. Abilita il provider 'Anonimo'.");
+                                document.body.innerHTML = `<div class='p-4 text-red-700 bg-red-100 border border-red-400 rounded'>ERRORE: Accesso anonimo non abilitato nel progetto Firebase. Segui le istruzioni nell'alert per risolvere e ricarica la pagina.</div>`;
+                            }
                         }
                     }
                 });
             } catch (error) {
                 console.error("Errore di inizializzazione Firebase:", error);
-                document.body.innerHTML = "Errore critico durante l'inizializzazione dell'applicazione. Controlla la console.";
+                document.body.innerHTML = `Errore critico durante l'inizializzazione dell'applicazione. Controlla la console per dettagli.<br>${error.message}`;
             }
         }
 
+        // --- Popolamento Iniziale del Database ---
         async function seedDatabaseIfNeeded() {
             const q = query(collection(db, devicesCollectionPath));
             const querySnapshot = await getDocs(q);
@@ -319,14 +217,18 @@
             }
         }
         
+        // --- Listener per le Modifiche in Tempo Reale ---
         function listenForDeviceChanges() {
             const q = query(collection(db, devicesCollectionPath));
             onSnapshot(q, (snapshot) => {
                 allDevicesFromDB = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 displayDevices(allDevicesFromDB, searchInputEl.value);
+            }, (error) => {
+                console.error("Errore nell'ascolto dei cambiamenti:", error);
             });
         }
         
+        // --- Funzioni di Creazione e Visualizzazione UI ---
         function highlightText(text, query) {
             if (!text) return '';
             if (!query || query.length < 1) return text;
@@ -364,7 +266,7 @@
                     <div class="edit-codes-container space-y-2 max-h-48 overflow-y-auto pr-2">
                     ${(device.codici || []).map(c => `
                         <div class="code-row space-y-1 border-t pt-2 mt-2">
-                            <div class="grid grid-cols-[1fr_120px_auto] gap-2 items-center">
+                            <div class="grid grid-cols-[1fr,120px,auto] gap-2 items-center">
                                 <input type="text" value="${c.codice || ''}" class="edit-codice-val p-1 border rounded" placeholder="Codice LEA">
                                 <input type="text" value="${c.prezzo || ''}" class="edit-prezzo-val p-1 border rounded" placeholder="Prezzo (€)">
                                 <button class="remove-code-btn text-red-500 hover:text-red-700 p-1"><i class="fas fa-trash-alt"></i></button>
@@ -389,7 +291,7 @@
                 </div>
             `;
 
-            card.innerHTML = `<div class="flex-grow overflow-y-auto pr-2">${viewModeHtml}${editModeHtml}</div>${controlsHtml}`;
+            card.innerHTML = `<div class="flex-grow min-h-0 overflow-y-auto pr-2">${viewModeHtml}${editModeHtml}</div>${controlsHtml}`;
             addCardEventListeners(card, device);
             return card;
         }
@@ -617,3 +519,4 @@
     </script>
 </body>
 </html>
+

@@ -264,15 +264,14 @@
         const storage = getStorage(app);
         const auth = getAuth(app);
         
+        let allDevices = [];
+        let currentSort = { serie: 'prodotto', suMisura: 'prodotto' };
+        let macroCategoriesList = [];
+        let categoriesDocId = null;
+        let unsubscribeDevices = null;
+        let unsubscribeCategories = null;
+
         document.addEventListener('DOMContentLoaded', () => {
-            let allDevices = [];
-            let currentSort = { serie: 'prodotto', suMisura: 'prodotto' };
-            let macroCategoriesList = [];
-            let categoriesDocId = null;
-            let unsubscribeDevices = null;
-            let unsubscribeCategories = null;
-            
-            // Riferimenti al DOM
             const searchInputEl = document.getElementById('searchInput');
             const filterMacroCategoryEl = document.getElementById('filterMacroCategory');
             const filterMarcaEl = document.getElementById('filterMarca');
@@ -305,7 +304,7 @@
             function closeConfirmationModal() { closeModal(confirmationModalEl); confirmationCallback = null; }
             function highlightText(text, query) { if (!text) return ''; if (!query || query.length < 1) return text; const sanitizedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const regex = new RegExp(`(${sanitizedQuery})`, 'gi'); return text.replace(regex, `<span class="highlight">$1</span>`); }
             
-            function createDeviceListItem(device, query) { const item = document.createElement('div'); item.className = 'device-list-item'; const placeholderIcon = `<svg class="w-full h-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.993A1 1 0 001 20h22a1 1 0 001-1.007zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-14h2v6h-2zm0 8h2v2h-2z"></path></svg>`; const imageHtml = `<img src="${device.imageUrl || ''}" onerror="this.onerror=null;this.parentElement.innerHTML='${placeholderIcon}';" class="device-thumbnail" alt="Anteprima ${device.prodotto}">`; item.innerHTML = `<div class="h-32 mb-4 bg-gray-100 rounded flex items-center justify-center">${imageHtml}</div><div class="flex-grow"><div class="font-semibold text-gray-800 truncate">${highlightText(device.prodotto, query)}</div><div class="text-sm text-gray-500">${highlightText(device.marca, query)}</div></div><div class="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">${highlightText(device.categoriaOrtesi, query) || 'Senza categoria'}</div>`; item.addEventListener('click', () => openDeviceModal(device)); return item; }
+            function createDeviceListItem(device, query) { const item = document.createElement('div'); item.className = 'device-list-item'; const placeholderIcon = `<svg class="w-full h-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.993A1 1 0 001 20h22a1 1 0 001-1.007zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-14h2v6h-2zm0 8h2v2h-2z"></path></svg>`; const imageHtml = `<img src="${device.imageUrl || ''}" onerror="this.onerror=null;this.parentElement.innerHTML='${placeholderIcon.replace(/"/g, "&quot;")}';" class="device-thumbnail" alt="Anteprima ${device.prodotto}">`; item.innerHTML = `<div class="h-32 mb-4 bg-gray-100 rounded flex items-center justify-center">${imageHtml}</div><div class="flex-grow"><div class="font-semibold text-gray-800 truncate">${highlightText(device.prodotto, query)}</div><div class="text-sm text-gray-500">${highlightText(device.marca, query)}</div></div><div class="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">${highlightText(device.categoriaOrtesi, query) || 'Senza categoria'}</div>`; item.addEventListener('click', () => openDeviceModal(device)); return item; }
 
             function populateFilters() {
                 const currentCategory = filterMacroCategoryEl.value; const currentMarca = filterMarcaEl.value;
@@ -535,5 +534,3 @@
     </script>
 </body>
 </html>
-
-

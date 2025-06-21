@@ -246,7 +246,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, writeBatch, query, where, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
@@ -264,14 +264,14 @@
         const storage = getStorage(app);
         const auth = getAuth(app);
         
-        let allDevices = [];
-        let currentSort = { serie: 'prodotto', suMisura: 'prodotto' };
-        let macroCategoriesList = [];
-        let categoriesDocId = null;
-        let unsubscribeDevices = null;
-        let unsubscribeCategories = null;
-
         document.addEventListener('DOMContentLoaded', () => {
+            let allDevices = [];
+            let currentSort = { serie: 'prodotto', suMisura: 'prodotto' };
+            let macroCategoriesList = [];
+            let categoriesDocId = null;
+            let unsubscribeDevices = null;
+            let unsubscribeCategories = null;
+            
             const searchInputEl = document.getElementById('searchInput');
             const filterMacroCategoryEl = document.getElementById('filterMacroCategory');
             const filterMarcaEl = document.getElementById('filterMarca');
@@ -342,6 +342,8 @@
                 const imageInput = modalBox.querySelector('#imageUploader');
                 const imageFile = imageInput.files[0];
                 const removeImage = imageInput.dataset.removeImage === 'true';
+                
+                const docRef = isNew ? doc(collection(db, "devices")) : doc(db, "devices", device.id);
 
                 try {
                     if(removeImage && device.imagePath) {
@@ -350,8 +352,7 @@
                         updatedData.imageUrl = '';
                         updatedData.imagePath = '';
                     } else if (imageFile) {
-                        const deviceId = isNew ? doc(collection(db, "devices")).id : device.id; 
-                        const imagePath = `images/${deviceId}/${Date.now()}_${imageFile.name}`;
+                        const imagePath = `images/${docRef.id}/${Date.now()}_${imageFile.name}`;
                         const newImageRef = ref(storage, imagePath);
                         
                         await uploadBytes(newImageRef, imageFile);
@@ -362,9 +363,9 @@
                     }
 
                     if (isNew) {
-                        await addDoc(collection(db, "devices"), updatedData);
+                        await setDoc(docRef, updatedData);
                     } else {
-                        await updateDoc(doc(db, "devices", device.id), updatedData);
+                        await updateDoc(docRef, updatedData);
                     }
                     closeModal(deviceModalEl);
                 } catch (error) {

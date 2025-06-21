@@ -272,6 +272,7 @@
             let unsubscribeDevices = null;
             let unsubscribeCategories = null;
             
+            // Riferimenti al DOM
             const searchInputEl = document.getElementById('searchInput');
             const filterMacroCategoryEl = document.getElementById('filterMacroCategory');
             const filterMarcaEl = document.getElementById('filterMarca');
@@ -295,6 +296,9 @@
             const notificationOkButton = document.getElementById('notificationOkButton');
             const categoriesModalEl = document.getElementById('categoriesModal');
             const exportOptionsModalEl = document.getElementById('exportOptionsModal');
+            const toggleSerieEl = document.getElementById('toggleSerie');
+            const toggleSuMisuraEl = document.getElementById('toggleSuMisura');
+
             let confirmationCallback = null;
 
             function openModal(modalElement) { modalElement.classList.add('visible'); }
@@ -506,6 +510,7 @@
                     populateFilters(); 
                 }, (error) => {
                     console.error("Errore listener dispositivi:", error);
+                    showNotification("ERRORE: Impossibile leggere i dati. Controlla le regole di sicurezza di Firestore.");
                 });
                 const categoriesCol = collection(db, "categories");
                 unsubscribeCategories = onSnapshot(categoriesCol, (snapshot) => {
@@ -535,3 +540,4 @@
     </script>
 </body>
 </html>
+
